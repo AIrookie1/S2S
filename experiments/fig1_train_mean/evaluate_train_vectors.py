@@ -22,7 +22,7 @@ from experiments.fig1_train_mean.vector_utils import (  # noqa: E402
     find_answer_rows,
     load_pair_vector_data,
 )
-from model.methods.static.evaluate_onlysteer import (  # noqa: E402
+from method.dyn3d_sga.eval_utils import (  # noqa: E402
     HF_NAMES,
     calculate_scores_zeroshot,
     get_additive_intervention,

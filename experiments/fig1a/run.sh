@@ -24,7 +24,7 @@ if [[ "$EXTRACT_FEATURES" == "1" ]]; then
   for layer in $LAYERS; do
     base="${FEATURE_DIR}/${MODEL_NAME}_layer${layer}_dynSVD_pairs.npz"
     if [[ ! -f "$base" ]]; then
-      CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON" model/methods/dynSVD/extract_dynSVD_features.py \
+      CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON" method/dyn3d_sga/extract_features.py \
         "$MODEL_NAME" --layer "$layer" --save_dir "$FEATURE_DIR" \
         --output_name "$(basename "$base")" --model_dir "$MODEL_DIR" \
         --batch_size 1 --num_folds 2 --split_seed 42 --dtype float16 --device cuda

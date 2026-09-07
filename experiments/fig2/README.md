@@ -7,7 +7,7 @@ Five checkpoints therefore produce a 5 (questions) x 5 (datasets) grid; one
 checkpoint produces five question panels.
 
 The router input is the normalized hidden state at the final token of the
-Q: <question> A: prompt, matching model/methods/dynSVD/evaluate_dynSVD.py.
+Q: <question> A: prompt, matching method/dyn3d_sga/evaluate_dynSVD.py.
 The script does not train or run MC scoring.
 
 Example from the repository root:

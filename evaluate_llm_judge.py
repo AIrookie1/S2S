@@ -21,7 +21,7 @@ from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from baukit import TraceDict
 
-from spherical_steering import get_spherical_intervention
+from method.spherical_steering.steering import get_spherical_intervention
 
 # ==================== Constants ====================
 

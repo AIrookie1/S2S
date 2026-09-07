@@ -29,7 +29,7 @@ from baukit import TraceDict
 
 # spherical_steering.py lives in parent directory (ICML2026/)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from spherical_steering import get_spherical_intervention
+from method.spherical_steering.steering import get_spherical_intervention
 from utils_generic import HF_NAMES, MMLU_CATEGORIES, set_seed
 
 

@@ -28,7 +28,7 @@ if str(ROOT) not in sys.path:
 
 from experiments.fig1_train_mean.evaluate_train_vectors import score_one_choice
 from experiments.fig1_train_mean.vector_utils import find_answer_rows, load_pair_vector_data
-from model.methods.static.evaluate_onlysteer import (
+from method.dyn3d_sga.eval_utils import (
     HF_NAMES,
     calculate_scores_zeroshot,
     get_layer_name,
@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("model_name", nargs="?", default="llama3.1-8B-Instruct")
     parser.add_argument(
         "--feature_template",
-        default="./features/llama3.1-8B-Instruct_layer{layer}_dynSVD_pairs_fold{fold}.npz",
+        default="./features/llama3.1-8B-Instruct_layer{layer}_dynSVD_pairs.npz",
         help="Feature path template containing {layer} and {fold}.",
     )
     parser.add_argument(

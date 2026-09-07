@@ -58,8 +58,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from model.methods.dynSVD.dynSVD import ResidualRouter  # noqa: E402
-from model.methods.static.evaluate_onlysteer import (  # noqa: E402
+from method.dyn3d_sga.dynSVD import ResidualRouter  # noqa: E402
+from method.dyn3d_sga.eval_utils import (  # noqa: E402
     HF_NAMES,
     get_instruction,
     load_truthfulqa_mc_dataframe,

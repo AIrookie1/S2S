@@ -29,7 +29,7 @@ from truthfulqa.models import MC_calcs, set_columns
 from truthfulqa.presets import preset_map
 
 from baukit import TraceDict
-from spherical_steering import get_spherical_intervention
+from method.spherical_steering.steering import get_spherical_intervention
 
 # ==================== Constants ====================
 

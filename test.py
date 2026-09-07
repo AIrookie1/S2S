@@ -25,12 +25,12 @@ def load_module(module_path: Path) -> ModuleType:
 
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(
-        description="调用 model/methods/<method>/<entry> 中的 main() 函数"
+        description="调用 method/<method>/<entry> 中的 main() 函数"
     )
     parser.add_argument(
         "--method-dir",
-        default="dynSVD",
-        help="方法名：dynSVD（Dynamic SVD）或 mean_diff（标准 baseline）",
+        default="dyn3d_sga",
+        help="方法名：dyn3d_sga（Similarity-Graph Adaptive 3D Steering）",
     )
     parser.add_argument(
         "--entry-file",
@@ -58,12 +58,13 @@ def main() -> None:
         entry_file += ".py"
 
     aliases = {
-        "dynsvd": "dynSVD",
-        "mean_diff": "mean_diff",
-        "standard_steer": "mean_diff",
+        "dynsvd": "dyn3d_sga",
+        "3d-dyn": "dyn3d_sga",
+        "dyn3d": "dyn3d_sga",
+        "sga-2slerp": "dyn3d_sga",
     }
     method = aliases.get(launcher_args.method_dir.lower(), launcher_args.method_dir.lower())
-    target_path = (project_root / "model" / "methods" / method / entry_file).resolve()
+    target_path = (project_root / "method" / method / entry_file).resolve()
 
     if not target_path.is_file():
         raise FileNotFoundError(
