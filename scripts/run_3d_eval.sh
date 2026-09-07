@@ -9,7 +9,7 @@ POSITIVE_MODE="${POSITIVE_MODE:-mean}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-float16}"
 WEIGHT_KAPPA="${WEIGHT_KAPPA:-5.0}"
-WEIGHT_TEMPERATURE="${WEIGHT_TEMPERATURE:-0.5}"
+WEIGHT_TEMPERATURE="${WEIGHT_TEMPERATURE:-0.1}"
 HIDDEN_COSINE_THRESHOLD="${HIDDEN_COSINE_THRESHOLD:-0.99}"
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}_dynSVD_fold${FOLD_IDX}_${POSITIVE_MODE}.npz}"
 OUTPUT_PATH="${OUTPUT_PATH:-$RESULT_DIR/${MODEL}_l${LAYER}_3d_dyn_fold${FOLD_IDX}_${POSITIVE_MODE}_similarity_adaptive.json}"
@@ -29,6 +29,7 @@ EVAL_ARGS=(
   --output_path "$OUTPUT_PATH"
   --hidden_cosine_threshold "$HIDDEN_COSINE_THRESHOLD"
   --save_details
+  --model_dir /mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
 )
 [[ -n "${MODEL_DIR:-}" ]] && EVAL_ARGS+=(--model_dir "$MODEL_DIR")
 [[ "${FEW_SHOT:-0}" == 1 ]] && EVAL_ARGS+=(--few_shot)

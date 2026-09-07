@@ -95,7 +95,7 @@ def slerp(x, y, t, eps=1e-8, small_angle_threshold=1e-4):
         + torch.sin(t_tensor * theta) / sin_theta.clamp_min(eps) * y
     )
     linear = norm((1 - t_tensor) * x + t_tensor * y, eps)
-    return torch.where(theta.abs() < small_angle_threshold, linear, result)
+    return result#torch.where(theta.abs() < small_angle_threshold, linear, result)
 
 
 def two_slerp(a, b, c, wa, wb, wc, eps, small_angle_threshold):
@@ -115,7 +115,7 @@ def two_slerp_sym(a, b, c, alpha, beta, gamma, eps=1e-8, small_angle_threshold=1
     first = two_slerp(a, b, c, alpha, beta, gamma, eps, small_angle_threshold)
     second = two_slerp(b, c, a, beta, gamma, alpha, eps, small_angle_threshold)
     third = two_slerp(c, a, b, gamma, alpha, beta, eps, small_angle_threshold)
-    return norm(alpha * first + beta * second + gamma * third, eps)
+    return norm(alpha * first + beta * second + gamma * third, eps)#
 
 
 def validate_weights(alpha, beta, gamma):
@@ -161,7 +161,7 @@ def get_3d_dynamic_intervention(
             ),
         )
         z = hidden[:, start, :].float()
-        coeff = torch.softmax(router.logits(z), dim=-1)
+        coeff = torch.softmax(router.logits(hidden[:, -1, :].float()), dim=-1)
         residual = normalize_basis_combination(coeff, basis).float()
         original = hidden[:, start:, :].float()
         original_norm = torch.linalg.vector_norm(original, dim=-1, keepdim=True).clamp_min(eps)
