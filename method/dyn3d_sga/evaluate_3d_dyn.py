@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -136,6 +137,7 @@ def get_3d_dynamic_intervention(
     weight_temperature=0.5,
     eps=1e-8,
     small_angle_threshold=1e-4,
+    use_gate=True,
     stats=None,
 ):
     """Build the 3d rotation hook and count every considered token."""
@@ -172,10 +174,11 @@ def get_3d_dynamic_intervention(
             a, b, c, alpha, beta, gamma, eps, small_angle_threshold
         )
         candidate = rotated_direction * original_norm
-        # Keep the adaptive graph gate: beta + gamma must dominate alpha
-        # before a token is replaced by the spherical candidate.  ``gate`` is
-        # already shaped [batch, tokens, 1], so do not append another axis.
+        # When enabled, steer only where beta + gamma dominates alpha.
+        # ``gate`` is shaped [batch, tokens, 1] for direct broadcasting.
         gate = (beta + gamma) > alpha
+        if not use_gate:
+            gate = torch.ones_like(gate, dtype=torch.bool)
         edited = hidden.clone()
         edited[:, start:, :] = torch.where(
             gate, candidate, original
@@ -215,6 +218,13 @@ def main():
     parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="float16")
     parser.add_argument("--slerp_eps", type=float, default=1e-8)
     parser.add_argument("--small_angle_threshold", type=float, default=1e-4)
+    parser.add_argument(
+        "--use_gate",
+        type=int,
+        choices=[0, 1],
+        default=1,
+        help="1: steer only when beta + gamma > alpha; 0: steer every active token",
+    )
     parser.add_argument("--output_path", default=None)
     parser.add_argument("--save_details", action="store_true")
     args = parser.parse_args()
@@ -224,7 +234,8 @@ def main():
     data, avg, basis, router, scale_net = load_components(args.checkpoint_path, device)
     print(
         f"3d-dyn | dim={basis.shape[1]} rank={basis.shape[0]} "
-        f"adaptive_kappa={args.weight_kappa} temperature={args.weight_temperature}"
+        f"adaptive_kappa={args.weight_kappa} temperature={args.weight_temperature} "
+        f"gate={'on' if args.use_gate else 'off'}"
     )
     model_path = args.model_dir or HF_NAMES.get(args.model_name, args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -270,6 +281,7 @@ def main():
         weight_temperature=args.weight_temperature,
         eps=args.slerp_eps,
         small_angle_threshold=args.small_angle_threshold,
+        use_gate=bool(args.use_gate),
         stats=stats,
     )
     progress = tqdm(range(len(results)), desc=mode)
@@ -304,8 +316,46 @@ def main():
             results.loc[i, f"{tag} scores_true"] = str(scores_true)
             results.loc[i, f"{tag} scores_false"] = str(scores_false)
 
-    results.to_json(args.output_path, orient="records", force_ascii=False)
+    # Write a readable report: summary metrics first, followed by the
+    # original per-question records under ``results``.  ``indent`` keeps the
+    # summary and raw records visually separated by newlines.
+    metric_values = {
+        metric: float(results[f"{tag} {metric}"].mean())
+        for metric in ("MC1", "MC2", "MC3")
+    }
     token_rate = 100.0 * stats["steered"] / max(stats["total"], 1)
+    metrics = {
+        **metric_values,
+        "token_steer_rate_percent": token_rate,
+        "steered_tokens": int(stats["steered"]),
+        "total_tokens": int(stats["total"]),
+        "gate_enabled": bool(args.use_gate),
+    }
+    if stats["weight_count"]:
+        metrics["mean_adaptive_weights"] = {
+            "alpha": stats["alpha_sum"] / stats["weight_count"],
+            "beta": stats["beta_sum"] / stats["weight_count"],
+            "gamma": stats["gamma_sum"] / stats["weight_count"],
+        }
+    report = {
+        "method": "Similarity-Graph Adaptive 3D Spherical Steering",
+        "model_name": args.model_name,
+        "layer": int(args.layer),
+        "eval_split": args.eval_split,
+        "checkpoint_path": str(args.checkpoint_path),
+        "parameters": {
+            "weight_kappa": args.weight_kappa,
+            "weight_temperature": args.weight_temperature,
+            "use_gate": bool(args.use_gate),
+            "few_shot": bool(args.few_shot),
+            "preset": args.preset,
+        },
+        "metrics": metrics,
+        "results": json.loads(results.to_json(orient="records", force_ascii=False)),
+    }
+    with open(args.output_path, "w", encoding="utf-8") as handle:
+        json.dump(report, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
     print(f"Saved results to {args.output_path}")
     print(f"Token steer rate: {token_rate:.4f}% ({stats['steered']}/{stats['total']} tokens)")
     if stats["weight_count"]:

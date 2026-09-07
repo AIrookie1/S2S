@@ -10,6 +10,7 @@ DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-float16}"
 WEIGHT_KAPPA="${WEIGHT_KAPPA:-5.0}"
 WEIGHT_TEMPERATURE="${WEIGHT_TEMPERATURE:-0.1}"
+USE_GATE=0
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}_dynSVD_fold${FOLD_IDX}_${POSITIVE_MODE}.npz}"
 OUTPUT_PATH="${OUTPUT_PATH:-$RESULT_DIR/${MODEL}_l${LAYER}_3d_dyn_fold${FOLD_IDX}_${POSITIVE_MODE}_similarity_adaptive.json}"
 
@@ -23,6 +24,7 @@ EVAL_ARGS=(
   --eval_split "${EVAL_SPLIT:-test}"
   --weight_kappa "$WEIGHT_KAPPA"
   --weight_temperature "$WEIGHT_TEMPERATURE"
+  --use_gate "$USE_GATE"
   --device "$DEVICE"
   --dtype "$DTYPE"
   --output_path "$OUTPUT_PATH"
@@ -35,6 +37,6 @@ EVAL_ARGS=(
 [[ "${NO_INSTRUCTION:-0}" == 1 ]] && EVAL_ARGS+=(--no_instruction)
 [[ "${NO_INTERVENTION:-0}" == 1 ]] && EVAL_ARGS+=(--no_intervention)
 
-echo "3d-dyn Similarity-Graph adaptive inference | fold=$FOLD_IDX | kappa=$WEIGHT_KAPPA temperature=$WEIGHT_TEMPERATURE"
+echo "3d-dyn Similarity-Graph adaptive inference | fold=$FOLD_IDX | kappa=$WEIGHT_KAPPA temperature=$WEIGHT_TEMPERATURE | gate=$USE_GATE"
 CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" test.py "${EVAL_ARGS[@]}"
 test -s "$OUTPUT_PATH"

@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../common.sh"
 
 # Fold and data
-FOLD_IDX=1
+FOLD_IDX=0
 NUM_FOLDS=2
 POSITIVE_MODE=mean
 USE_DATA_MODE=0
