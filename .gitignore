@@ -5,3 +5,17 @@ TruthfulQA
 truthfulqa
 results_llm_judge
 results_llm_judge_dynSVD_spherical
+features_generic
+checkpoints_generic
+experiments/**/figures
+experiments/**/results
+experiments/**/checkpoints
+
+__pycache__
+**/__pycache__
+**/**/__pycache__
+**/**/**/__pycache__
+experiments/**/*.png
+experiments/**/*.pdf
+experiments/**/*.svg
+

@@ -1,0 +1,24 @@
+{
+  "dataset": "winogrande",
+  "metric": "MC1",
+  "MC1": 0.5288082083662194,
+  "model_name": "llama3.1-8B-Instruct",
+  "layer": 16,
+  "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_winogrande_l16_dyn3d.npz",
+  "steering_enabled": true,
+  "parameters": {
+    "weight_kappa": 100.0,
+    "weight_temperature": 1.0,
+    "use_gate": true,
+    "seed": 42
+  },
+  "steering_stats": {
+    "steered_tokens": 3060,
+    "total_tokens": 5311,
+    "mean_adaptive_weights": {
+      "alpha": 0.3989238465905212,
+      "beta": 0.46769369999762195,
+      "gamma": 0.1333824433870312
+    }
+  }
+}

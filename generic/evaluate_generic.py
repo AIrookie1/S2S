@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import json
 import torch
 import numpy as np
 import os
@@ -31,57 +32,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from method.dyn3d_sga.evaluate_dynSVD import load_components
 from method.dyn3d_sga.evaluate_3d_dyn import get_3d_dynamic_intervention
 from utils_generic import HF_NAMES, MMLU_CATEGORIES, set_seed
-
-
-# ============================================================
-# Prompt Formatters
-# ============================================================
-
-def format_copa_prompt(premise, question_type, choice1, choice2):
-    return (
-        f"Question:\n{premise} Based on the previous passage, "
-        f"choose the most reasonable {question_type}.\n"
-        f"A: {choice1}\nB: {choice2}\n\nAnswer:"
-    )
-
-
-def format_storycloze_prompt(sentences, opt1, opt2):
-    story = " ".join(sentences) if isinstance(sentences, list) else sentences
-    return (
-        f"{story}\n\nQuestion: Which ending makes more sense?\n"
-        f"A. {opt1}\nB. {opt2}\nAnswer:"
-    )
-
-
-def format_mmlu_prompt(tokenizer, question, choices):
-    """Format MMLU prompt using chat template (for Instruct models)."""
-    user_content = (
-        "You are solving a multiple-choice question.\n\n"
-        "Choose the correct option AND output the option text EXACTLY as written.\n"
-        "Rules:\n"
-        "- Output must be a verbatim copy of ONE option's text.\n"
-        "- Do NOT output the option letter (A/B/C/D).\n"
-        "- Do NOT add explanations, punctuation, or extra words.\n"
-        "- Do NOT paraphrase. Copy the option text exactly.\n\n"
-        f"Question: {question}\n"
-        "Options:\n"
-        f"A) {choices[0]}\nB) {choices[1]}\nC) {choices[2]}\nD) {choices[3]}\n\n"
-        "Final answer (verbatim option text only):"
-    )
-    messages = [{"role": "user", "content": user_content}]
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-
-
-def format_winogrande_prompt(sentence, option1, option2):
-    return (
-        f"Q: {sentence}\n"
-        f"Which option correctly fills the blank?\n"
-        f"1) {option1}\n2) {option2}\nA:"
-    )
-
-
-def format_boolq_prompt(passage, question):
-    return f"Passage: {passage}\nQuestion: {question}\nA:"
+from prompts_generic import (
+    format_boolq_prompt,
+    format_copa_prompt,
+    format_mmlu_prompt,
+    format_storycloze_prompt,
+    format_winogrande_prompt,
+)
 
 
 # ============================================================
@@ -132,6 +89,18 @@ def calculate_option_score(model, tokenizer, base_prompt, option_text,
 # Per-dataset Evaluation Functions
 # ============================================================
 
+
+def format_progress(correct, total, steering_stats):
+    """Format live accuracy and cumulative Dyn3D weight means."""
+    text = f"Acc:{correct / max(total, 1):.4f}"
+    count = steering_stats.get("weight_count", 0)
+    if count:
+        alpha = steering_stats.get("alpha_sum", 0.0) / count
+        beta = steering_stats.get("beta_sum", 0.0) / count
+        gamma = steering_stats.get("gamma_sum", 0.0) / count
+        text += f" W:{alpha:.3f}/{beta:.3f}/{gamma:.3f}"
+    return text
+
 def evaluate_copa(model, tokenizer, hook_fn, layer_name, device, steering_stats):
     """Evaluate on COPA validation set (100 samples)."""
     print("Loading COPA validation set...")
@@ -156,7 +125,7 @@ def evaluate_copa(model, tokenizer, hook_fn, layer_name, device, steering_stats)
         if np.argmax(scores) == correct_idx:
             correct += 1
         total += 1
-        pbar.set_description(f"Acc: {correct/total:.4f}")
+        pbar.set_description(format_progress(correct, total, steering_stats))
 
     return correct / total
 
@@ -183,7 +152,7 @@ def evaluate_storycloze(model, tokenizer, hook_fn, layer_name, device, steering_
         if np.argmax(scores) == correct_idx:
             correct += 1
         total += 1
-        pbar.set_description(f"Acc: {correct/total:.4f}")
+        pbar.set_description(format_progress(correct, total, steering_stats))
 
     return correct / total
 
@@ -205,7 +174,7 @@ def _evaluate_mmlu_items(model, tokenizer, hook_fn, layer_name, device, items, s
         if np.argmax(scores) == correct_idx:
             correct += 1
         total += 1
-        pbar.set_description(f"Acc: {correct/total:.4f}")
+        pbar.set_description(format_progress(correct, total, steering_stats))
 
     return correct / total
 
@@ -223,7 +192,7 @@ def evaluate_mmlu_global(model, tokenizer, hook_fn, layer_name, device,
         loaded = []
         for sub in subsets:
             try:
-                loaded.append(load_dataset("cais/mmlu", sub, split='test'))
+                local_root=os.environ.get("MMLU_CACHE_DIR", "/root/.cache/huggingface/datasets/mmlu"); file_split="dev" if eval_split == "train" else eval_split; local_file=os.path.join(local_root, sub, f"{file_split}-00000-of-00001.parquet"); loaded.append(Dataset.from_parquet(local_file))
             except:
                 pass
         if not loaded:
@@ -271,7 +240,7 @@ def evaluate_winogrande(model, tokenizer, hook_fn, layer_name, device, steering_
         if np.argmax(scores) == correct_idx:
             correct += 1
         total += 1
-        pbar.set_description(f"Acc: {correct/total:.4f}")
+        pbar.set_description(format_progress(correct, total, steering_stats))
 
     return correct / total
 
@@ -298,7 +267,7 @@ def evaluate_boolq(model, tokenizer, hook_fn, layer_name, device, steering_stats
         if np.argmax(scores) == correct_idx:
             correct += 1
         total += 1
-        pbar.set_description(f"Acc: {correct/total:.4f}")
+        pbar.set_description(format_progress(correct, total, steering_stats))
 
     return correct / total
 
@@ -322,6 +291,9 @@ def main():
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument(
+        '--output_path', type=str, default=None,
+        help='Optional path for the dataset MC1 result JSON')
 
     args = parser.parse_args()
     set_seed(args.seed)
@@ -392,9 +364,53 @@ def main():
         if steering_stats['total'] > 0:
             steer_pct = steering_stats['steered'] / steering_stats['total'] * 100
             print(f"Stats:      Steered={steering_stats['steered']}/{steering_stats['total']} ({steer_pct:.1f}%)")
+        if steering_stats.get("weight_count", 0):
+            count = steering_stats["weight_count"]
+            print(
+                "Mean weights (alpha/beta/gamma): "
+                f"{steering_stats['alpha_sum'] / count:.6f} / "
+                f"{steering_stats['beta_sum'] / count:.6f} / "
+                f"{steering_stats['gamma_sum'] / count:.6f}"
+            )
     print("-" * 50)
     print(f"Accuracy:   {accuracy:.4f}")
     print("=" * 50)
+
+    if args.output_path:
+        count = steering_stats.get("weight_count", 0)
+        result = {
+            "dataset": args.dataset,
+            "metric": "MC1",
+            "MC1": float(accuracy),
+            "model_name": args.model_name,
+            "layer": int(args.layer),
+            "checkpoint_path": args.checkpoint_path,
+            "steering_enabled": not args.disable_steering,
+            "parameters": {
+                "weight_kappa": args.weight_kappa,
+                "weight_temperature": args.weight_temperature,
+                "use_gate": bool(args.use_gate),
+                "seed": args.seed,
+            },
+            "steering_stats": {
+                "steered_tokens": int(steering_stats.get("steered", 0)),
+                "total_tokens": int(steering_stats.get("total", 0)),
+                "mean_adaptive_weights": (
+                    {
+                        "alpha": steering_stats["alpha_sum"] / count,
+                        "beta": steering_stats["beta_sum"] / count,
+                        "gamma": steering_stats["gamma_sum"] / count,
+                    }
+                    if count else None
+                ),
+            },
+        }
+        output_path = os.path.abspath(args.output_path)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as handle:
+            json.dump(result, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        print(f"Saved MC1 result to {output_path}")
 
 
 if __name__ == "__main__":

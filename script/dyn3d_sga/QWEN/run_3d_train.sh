@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../common.sh"
+MODEL=Qwen2.5-7B-Instruct
+MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Qwen2.5-7B-Instruct
+LAYER=19
+GPU=2
+source "$SCRIPT_DIR/../../common.sh"
 
 # Fold and data
-FOLD_IDX=0
+FOLD_IDX=1
 NUM_FOLDS=2
 POSITIVE_MODE=mean
 USE_DATA_MODE=0
 AUX_INTERP_COUNT=8
-VAL_FRACTION=0.70
+VAL_FRACTION=0.50
 
 # SVD decomposition
 SVD_MODE=energy
 SVD_RANK=32
-SVD_ENERGY=0.90
+SVD_ENERGY=0.40
 
 # Router training
 ROUTER_HIDDEN=256

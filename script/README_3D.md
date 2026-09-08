@@ -8,9 +8,12 @@ uses `WEIGHT_KAPPA` (default `5.0`), and the final node-importance Softmax uses
 one automatically; they are no longer fixed evaluation hyperparameters.
 
 ```bash
-FOLD_IDX=0 WEIGHT_KAPPA=5.0 WEIGHT_TEMPERATURE=0.5 \
-  ./script/dyn3d_sga/run_3d_eval.sh
+FOLD_IDX=0 WEIGHT_KAPPA=5.0 WEIGHT_TEMPERATURE=1.0 \
+  ./script/dyn3d_sga/LLAMA/run_3d_eval.sh
 ```
+
+Model-specific launchers are organized under `LLAMA/` and `QWEN/`. Each
+folder contains the complete extract, train, evaluate, and end-to-end pipeline.
 
 The implementation normalizes the raw hidden state once, pre-normalizes the
 mean direction once, and consumes the router output already normalized by

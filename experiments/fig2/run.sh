@@ -6,9 +6,10 @@ cd "$(dirname "$0")/../.."
 PYTHON=${PYTHON:-/root/miniconda3/envs/py310/bin/python}
 MODEL_DIR=${MODEL_DIR:-/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct}
 GPU=${CUDA_VISIBLE_DEVICES:-0}
-CHECKPOINTS=${CHECKPOINTS:-"features/llama3.1-8B-Instruct_layer14_dynSVD_fold0.npz features/llama3.1-8B-Instruct_layer14_dynSVD_fold1.npz"}
+CHECKPOINTS=${CHECKPOINTS:-"features/llama3.1-8B-Instruct_layer14_dynSVD_fold1_mean.npz"}
 NUM_QUESTIONS=${NUM_QUESTIONS:-5}
-NUM_VECTORS=${NUM_VECTORS:-5}
+NUM_VECTORS=${NUM_VECTORS:-32}
+SEED=${SEED:-42}
 OUTPUT_PREFIX=${OUTPUT_PREFIX:-./experiments/fig2/figures/fig2_router_weights}
 export PYTHONDONTWRITEBYTECODE=1
 
@@ -22,4 +23,5 @@ CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON" experiments/fig2/plot_router_weights.py \
   --model_dir "$MODEL_DIR" \
   --num_questions "$NUM_QUESTIONS" \
   --num_vectors "$NUM_VECTORS" \
+  --seed "$SEED" \
   --output_prefix "$OUTPUT_PREFIX"

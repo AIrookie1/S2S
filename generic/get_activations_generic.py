@@ -60,13 +60,13 @@ def main():
     # 2. Load Data
     prompts, labels, q_indices = get_dataset_data(
         args.dataset, split=args.split, num_samples=args.num_samples,
-        seed=args.seed
+        seed=args.seed, tokenizer=tokenizer
     )
 
     print(f"\n=== Data Statistics ===")
     print(f"Total samples: {len(prompts)}")
     print(f"Correct (label=1): {sum(labels)}, Incorrect (label=0): {len(labels) - sum(labels)}")
-    print(f"Example prompt: {prompts[0][:200]}...")
+    print(f"Example prompt: {prompts[0][:10]}...")
 
     # 3. Extract Features
     activations = get_layer_activations(model, tokenizer, prompts, args.layer, device)

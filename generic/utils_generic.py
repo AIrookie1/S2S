@@ -3,14 +3,15 @@ Utility functions for generic MC task evaluation with Spherical Steering.
 
 Supports: COPA, StoryCloze, MMLU (global), Winogrande, BoolQ
 
-Prompt style: Simple "Q: {question} A: {answer}" format.
+Training prompts are built from the same dataset-specific templates used by
+``evaluate_generic.py``.
 """
 
 import torch
 import numpy as np
 import random
 from baukit import TraceDict
-from datasets import load_dataset, concatenate_datasets
+from datasets import load_dataset, concatenate_datasets, Dataset
 from tqdm import tqdm
 
 
@@ -68,22 +69,21 @@ MMLU_CATEGORIES = {
 
 # ==================== Prompt Formatting ====================
 
-def format_prompt(question, answer=None):
-    """
-    Prompt: "Q: {question} A: {answer}"
-    """
-    if answer is not None:
-        return f"Q: {question} A: {answer}"
-    else:
-        return f"Q: {question} A:"
-
+from prompts_generic import (
+    append_option,
+    format_boolq_prompt,
+    format_copa_prompt,
+    format_mmlu_prompt,
+    format_storycloze_prompt,
+    format_winogrande_prompt,
+)
 
 # ============================================================
 # Data Loaders for Prototype Extraction (Training)
 # Returns: prompts, labels, q_indices
 # ============================================================
 
-def get_copa_data(seed=42):
+def get_copa_data(seed=42, tokenizer=None):
     """
     Load COPA (super_glue) train split (400 samples).
     For each item: correct choice → label=1, incorrect → label=0.
@@ -97,20 +97,16 @@ def get_copa_data(seed=42):
     for i, item in enumerate(dataset):
         premise = item["premise"]
         q_type = item["question"]
-        if q_type == "cause":
-            question = f"{premise} What was the cause of this?"
-        else:
-            question = f"{premise} What happened as a result?"
-
         choices = [item["choice1"], item["choice2"]]
         correct_label = item["label"]  # 0 or 1
+        base = format_copa_prompt(premise, q_type, *choices)
 
         # Correct
-        prompts.append(format_prompt(question, choices[correct_label]))
+        prompts.append(append_option(base, choices[correct_label]))
         labels.append(1)
         q_indices.append(i)
         # Incorrect
-        prompts.append(format_prompt(question, choices[1 - correct_label]))
+        prompts.append(append_option(base, choices[1 - correct_label]))
         labels.append(0)
         q_indices.append(i)
 
@@ -118,7 +114,7 @@ def get_copa_data(seed=42):
     return prompts, np.array(labels), np.array(q_indices)
 
 
-def get_storycloze_data(split='train', num_samples=None):
+def get_storycloze_data(split='train', num_samples=None, tokenizer=None):
     """
     Load XStoryCloze (English).
     For each story: correct ending → label=1, incorrect → label=0.
@@ -133,10 +129,10 @@ def get_storycloze_data(split='train', num_samples=None):
     prompts, labels, q_indices = [], [], []
 
     for i, item in enumerate(dataset):
-        story = " ".join([
+        story = [
             item['input_sentence_1'], item['input_sentence_2'],
             item['input_sentence_3'], item['input_sentence_4']
-        ])
+        ]
         opt1 = item['sentence_quiz1']
         opt2 = item['sentence_quiz2']
         correct_idx = item['answer_right_ending']  # 1 or 2
@@ -146,10 +142,11 @@ def get_storycloze_data(split='train', num_samples=None):
         else:
             correct_text, incorrect_text = opt2, opt1
 
-        prompts.append(format_prompt(story, correct_text))
+        base = format_storycloze_prompt(story, opt1, opt2)
+        prompts.append(append_option(base, correct_text))
         labels.append(1)
         q_indices.append(i)
-        prompts.append(format_prompt(story, incorrect_text))
+        prompts.append(append_option(base, incorrect_text))
         labels.append(0)
         q_indices.append(i)
 
@@ -157,7 +154,7 @@ def get_storycloze_data(split='train', num_samples=None):
     return prompts, np.array(labels), np.array(q_indices)
 
 
-def get_mmlu_global_data(split='train', seed=42):
+def get_mmlu_global_data(split='train', seed=42, tokenizer=None):
     """
     Load MMLU Global Balanced Dataset (all 4 categories combined).
 
@@ -168,6 +165,8 @@ def get_mmlu_global_data(split='train', seed=42):
     Creates a single balanced dataset for computing ONE global prototype
     and ONE micro-average accuracy across all of MMLU.
     """
+    if tokenizer is None:
+        raise ValueError("MMLU prompt construction requires a tokenizer")
     print(f"Loading MMLU Global Balanced (split={split})...")
 
     all_prompts, all_labels, all_q_indices = [], [], []
@@ -177,7 +176,7 @@ def get_mmlu_global_data(split='train', seed=42):
         loaded = []
         for sub in subsets:
             try:
-                loaded.append(load_dataset("cais/mmlu", sub, split='test'))
+                local_root=os.environ.get("MMLU_CACHE_DIR", "/root/.cache/huggingface/datasets/mmlu"); local_file=os.path.join(local_root, sub, "dev-00000-of-00001.parquet"); loaded.append(Dataset.from_parquet(local_file))
             except Exception as e:
                 print(f"  Warning: Failed to load {sub}: {e}")
         if not loaded:
@@ -204,12 +203,13 @@ def get_mmlu_global_data(split='train', seed=42):
             choices = item['choices']
             correct_idx = item['answer']
 
-            all_prompts.append(format_prompt(question, choices[correct_idx]))
+            base = format_mmlu_prompt(tokenizer, question, choices)
+            all_prompts.append(append_option(base, choices[correct_idx]))
             all_labels.append(1)
             all_q_indices.append(global_q_idx)
             for j, c in enumerate(choices):
                 if j != correct_idx:
-                    all_prompts.append(format_prompt(question, c))
+                    all_prompts.append(append_option(base, c))
                     all_labels.append(0)
                     all_q_indices.append(global_q_idx)
             global_q_idx += 1
@@ -218,7 +218,7 @@ def get_mmlu_global_data(split='train', seed=42):
     return all_prompts, np.array(all_labels), np.array(all_q_indices)
 
 
-def get_winogrande_data(split='train', num_samples=None, seed=42):
+def get_winogrande_data(split='train', num_samples=None, seed=42, tokenizer=None):
     """
     Load Winogrande (winogrande_xl).
     For each item: correct option → label=1, incorrect → label=0.
@@ -250,10 +250,11 @@ def get_winogrande_data(split='train', num_samples=None, seed=42):
         else:
             correct_text, incorrect_text = opt2, opt1
 
-        prompts.append(format_prompt(sentence, correct_text))
+        base = format_winogrande_prompt(sentence, opt1, opt2)
+        prompts.append(append_option(base, correct_text))
         labels.append(1)
         q_indices.append(i)
-        prompts.append(format_prompt(sentence, incorrect_text))
+        prompts.append(append_option(base, incorrect_text))
         labels.append(0)
         q_indices.append(i)
 
@@ -261,7 +262,7 @@ def get_winogrande_data(split='train', num_samples=None, seed=42):
     return prompts, np.array(labels), np.array(q_indices)
 
 
-def get_boolq_data(num_questions=2000, seed=42):
+def get_boolq_data(num_questions=2000, seed=42, tokenizer=None):
     """
     Load BoolQ (super_glue) train split.
     Options: ["no", "yes"], label: 0→no, 1→yes.
@@ -281,7 +282,7 @@ def get_boolq_data(num_questions=2000, seed=42):
         question = item["question"]
         label = int(item["label"])  # 0 or 1
 
-        base = f"Passage: {passage}\nQuestion: {question}\nA:"
+        base = format_boolq_prompt(passage, question)
 
         prompts.append(base + " " + options[label])
         labels.append(1)
@@ -296,18 +297,22 @@ def get_boolq_data(num_questions=2000, seed=42):
 
 # ==================== Unified Data Loader ====================
 
-def get_dataset_data(dataset_name, split='train', num_samples=None, seed=42):
+def get_dataset_data(
+    dataset_name, split='train', num_samples=None, seed=42, tokenizer=None
+):
     """Unified data loader interface."""
     if dataset_name == 'copa':
-        return get_copa_data(seed=seed)
+        return get_copa_data(seed=seed, tokenizer=tokenizer)
     elif dataset_name == 'storycloze':
-        return get_storycloze_data(split, num_samples)
+        return get_storycloze_data(split, num_samples, tokenizer=tokenizer)
     elif dataset_name == 'mmlu_global':
-        return get_mmlu_global_data(split, seed)
+        return get_mmlu_global_data(split, seed, tokenizer=tokenizer)
     elif dataset_name == 'winogrande':
-        return get_winogrande_data(split, num_samples, seed)
+        return get_winogrande_data(split, num_samples, seed, tokenizer=tokenizer)
     elif dataset_name == 'boolq':
-        return get_boolq_data(num_questions=num_samples or 2000, seed=seed)
+        return get_boolq_data(
+            num_questions=num_samples or 2000, seed=seed, tokenizer=tokenizer
+        )
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}. "
                          f"Choose from: copa, storycloze, mmlu_global, winogrande, boolq")
@@ -328,7 +333,12 @@ def get_layer_activations(model, tokenizer, prompts, layer_idx, device):
 
     with torch.no_grad():
         for prompt in tqdm(prompts, desc="Extracting"):
-            inputs = tokenizer(prompt, return_tensors='pt').to(device)
+            # Evaluation tokenizes the base prompt and option without adding
+            # another BOS token. Do the same here, especially for MMLU where
+            # the chat template already contains its own special tokens.
+            inputs = tokenizer(
+                prompt, return_tensors='pt', add_special_tokens=False
+            ).to(device)
 
             with TraceDict(model, [layer_name]) as ret:
                 model(**inputs)

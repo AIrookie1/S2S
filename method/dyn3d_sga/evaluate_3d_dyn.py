@@ -42,6 +42,9 @@ def adaptive_3way_weights(
     r: torch.Tensor,
     kappa: float = 5.0,
     temperature: float = 0.5,
+    hidden_prior: float = 0.5,
+    mean_prior: float = 0.25,
+    residual_prior: float = 0.25,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict]:
     """Return Similarity-Graph Adaptive 2-Slerp weights.
 
@@ -55,6 +58,7 @@ def adaptive_3way_weights(
         raise ValueError("weight kappa must be finite and positive")
     if not np.isfinite(temperature) or temperature <= 0:
         raise ValueError("weight temperature must be finite and positive")
+    validate_weights(hidden_prior, mean_prior, residual_prior)
 
     s_xv = (x * v).sum(dim=-1, keepdim=True)
     s_xr = (x * r).sum(dim=-1, keepdim=True)
@@ -67,8 +71,18 @@ def adaptive_3way_weights(
     attn_r = torch.softmax(kappa * torch.cat([s_xr, s_vr], dim=-1), dim=-1)
     a_rx, a_rv = attn_r[..., 0:1], attn_r[..., 1:2]
 
-    centrality = torch.cat([(a_vx + a_rx), (a_xv + a_rv), (a_xr + a_vr)], dim=-1)
-    # print((a_vx + a_rx), (a_xv + a_rv), (a_xr + a_vr))
+    # Inject the directional prior before the final centrality softmax:
+    # current hidden state X=0.5, mean direction V=0.25, residual R=0.25.
+    # The resulting alpha/beta/gamma are then used consistently by every
+    # ordering in the symmetric 2-Slerp composition below.
+    centrality = torch.cat(
+        [
+            (a_vx + a_rx),
+            (a_xv + a_rv),
+            (a_xr + a_vr),
+        ],
+        dim=-1,
+    )
     weights = torch.softmax(centrality / temperature, dim=-1)
     return (
         weights[..., 0:1],
@@ -79,6 +93,7 @@ def adaptive_3way_weights(
             "s_xr": s_xr,
             "s_vr": s_vr,
             "centrality": centrality,
+            "priors": (hidden_prior, mean_prior, residual_prior),
             "weights": weights,
         },
     )
@@ -134,7 +149,10 @@ def get_3d_dynamic_intervention(
     router,
     scale_net,
     weight_kappa=5.0,
-    weight_temperature=0.5,
+    weight_temperature=1.0,
+    hidden_prior=0.33,
+    mean_prior=0.33,
+    residual_prior=0.34,
     eps=1e-8,
     small_angle_threshold=1e-4,
     use_gate=True,
@@ -161,6 +179,7 @@ def get_3d_dynamic_intervention(
         )
         z = hidden[:, start, :].float()
         coeff = torch.softmax(router.logits(hidden[:, -1, :].float()), dim=-1)
+        # coeff = torch.softmax(router.logits(z.float()), dim=-1)
         residual = normalize_basis_combination(coeff, basis).float()
         original = hidden[:, start:, :].float()
         original_norm = torch.linalg.vector_norm(original, dim=-1, keepdim=True).clamp_min(eps)
@@ -168,8 +187,16 @@ def get_3d_dynamic_intervention(
         b = mean_direction.view(1, 1, -1).expand_as(a)
         c = residual.view(residual.shape[0], 1, -1).expand_as(a)
         alpha, beta, gamma, weight_info = adaptive_3way_weights(
-            a, b, c, kappa=weight_kappa, temperature=weight_temperature
+            a,
+            b,
+            c,
+            kappa=weight_kappa,
+            temperature=weight_temperature,
+            hidden_prior=hidden_prior,
+            mean_prior=mean_prior,
+            residual_prior=residual_prior,
         )
+
         rotated_direction = two_slerp_sym(
             a, b, c, alpha, beta, gamma, eps, small_angle_threshold
         )
@@ -209,6 +236,9 @@ def main():
     parser.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
     parser.add_argument("--weight_kappa", "--adaptive_kappa", dest="weight_kappa", type=float, default=5.0, help="Similarity attention sharpness for adaptive weights")
     parser.add_argument("--weight_temperature", "--adaptive_temperature", dest="weight_temperature", type=float, default=0.5, help="Softmax temperature for adaptive weights")
+    parser.add_argument("--hidden_prior", type=float, default=0.5, help="Centrality prior for the current hidden state")
+    parser.add_argument("--mean_prior", type=float, default=0.25, help="Centrality prior for the learned mean direction")
+    parser.add_argument("--residual_prior", type=float, default=0.25, help="Centrality prior for the routed residual direction")
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--preset", default="qa")
     parser.add_argument("--no_instruction", action="store_true")
@@ -229,12 +259,14 @@ def main():
     parser.add_argument("--save_details", action="store_true")
     args = parser.parse_args()
 
+    validate_weights(args.hidden_prior, args.mean_prior, args.residual_prior)
     set_seed(args.seed)
     device = resolve_device(args.device)
     data, avg, basis, router, scale_net = load_components(args.checkpoint_path, device)
     print(
         f"3d-dyn | dim={basis.shape[1]} rank={basis.shape[0]} "
         f"adaptive_kappa={args.weight_kappa} temperature={args.weight_temperature} "
+        f"prior={args.hidden_prior}/{args.mean_prior}/{args.residual_prior} "
         f"gate={'on' if args.use_gate else 'off'}"
     )
     model_path = args.model_dir or HF_NAMES.get(args.model_name, args.model_name)
@@ -279,6 +311,9 @@ def main():
         avg, basis, router, scale_net,
         weight_kappa=args.weight_kappa,
         weight_temperature=args.weight_temperature,
+        hidden_prior=args.hidden_prior,
+        mean_prior=args.mean_prior,
+        residual_prior=args.residual_prior,
         eps=args.slerp_eps,
         small_angle_threshold=args.small_angle_threshold,
         use_gate=bool(args.use_gate),
@@ -346,6 +381,11 @@ def main():
         "parameters": {
             "weight_kappa": args.weight_kappa,
             "weight_temperature": args.weight_temperature,
+            "centrality_prior": {
+                "hidden": args.hidden_prior,
+                "mean": args.mean_prior,
+                "residual": args.residual_prior,
+            },
             "use_gate": bool(args.use_gate),
             "few_shot": bool(args.few_shot),
             "preset": args.preset,

@@ -19,6 +19,11 @@ The conversion changes only the steering method. The original behavior is retain
 - argmax prediction and accuracy calculation;
 - MMLU category balancing and sample ranges.
 
+Training feature extraction and evaluation import their dataset-specific
+templates from `prompts_generic.py`. Consequently, COPA, StoryCloze, MMLU,
+Winogrande, and BoolQ use the same question text, option list, answer prefix,
+option boundary, and MMLU chat template on both sides.
+
 ## Complete run
 
 ```bash
@@ -36,6 +41,10 @@ The predefined layers remain unchanged:
 | Winogrande | 16 |
 
 Edit the clearly grouped variables at the top of `quick_set_generic.sh` to change GPU, model path, Dyn3D training settings, adaptive weights, or gate behavior.
+
+Each completed dataset writes its MC1 result directly under this directory as
+`generic/<dataset>_mc_results.json` (for example,
+`generic/copa_mc_results.json`).
 
 ## Manual run
 
@@ -67,8 +76,9 @@ python method/dyn3d_sga/train_dynSVD.py \
 python generic/evaluate_generic.py \
   --model_name llama3.1-8B-Instruct \
   --dataset storycloze --layer 27 \
-  --checkpoint_path ./checkpoints_generic/llama3.1-8B-Instruct_storycloze_l27_dyn3d.npz \
-  --weight_kappa 5.0 --weight_temperature 0.1 --use_gate 1
+    --checkpoint_path ./checkpoints_generic/llama3.1-8B-Instruct_storycloze_l27_dyn3d.npz \
+  --weight_kappa 5.0 --weight_temperature 0.1 --use_gate 1 \
+  --output_path ./generic/storycloze_mc_results.json
 ```
 
 Use `--disable_steering` for the original no-intervention baseline. Use `--use_gate 0` to apply Dyn3D steering to every active option token.
@@ -80,4 +90,5 @@ Use `--disable_steering` for the original no-intervention baseline. Use `--use_g
 | `get_activations_generic.py` | Extract the original dataset-specific training features |
 | `evaluate_generic.py` | Preserve the original MC evaluation while applying Dyn3D |
 | `utils_generic.py` | Original datasets, splits, prompts, and feature helpers |
+| `prompts_generic.py` | Shared dataset-specific training/evaluation prompts |
 | `quick_set_generic.sh` | Extract, train, and evaluate all five datasets |

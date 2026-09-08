@@ -1,0 +1,24 @@
+{
+  "dataset": "copa",
+  "metric": "MC1",
+  "MC1": 0.72,
+  "model_name": "llama3.1-8B-Instruct",
+  "layer": 16,
+  "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_copa_l16_dyn3d.npz",
+  "steering_enabled": true,
+  "parameters": {
+    "weight_kappa": 100.0,
+    "weight_temperature": 1.0,
+    "use_gate": false,
+    "seed": 42
+  },
+  "steering_stats": {
+    "steered_tokens": 1531,
+    "total_tokens": 1531,
+    "mean_adaptive_weights": {
+      "alpha": 0.10197989300993204,
+      "beta": 0.3502625450832559,
+      "gamma": 0.547757562899574
+    }
+  }
+}

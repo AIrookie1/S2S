@@ -2,13 +2,10 @@
 
 Each dynSVD checkpoint contains an MLP router whose output is a softmax
 distribution over the SVD residual vectors (basis[0] ... basis[r-1]). This
-script evaluates the router on the question prompt boundary used by
-evaluate_dynSVD.py and draws one panel per question/checkpoint.
-
-With five checkpoints and five questions the default layout is a 5 x 5 grid:
-columns are datasets/checkpoints and rows are questions. The script does not
-run evaluation or training; it only computes router weights and writes
-PNG/PDF/SVG plus CSV/JSON tables.
+script evaluates the router at the same question-prompt boundary used by
+evaluate_3d_dyn.py. For each checkpoint it draws a 5-question by 32-vector
+heatmap; color intensity encodes the router softmax value. The script does not
+run evaluation or training and also writes the underlying CSV/JSON tables.
 """
 
 from __future__ import annotations
@@ -25,33 +22,29 @@ import matplotlib as mpl
 mpl.rcParams.update(
     {
         "font.family": "sans-serif",
-        "font.sans-serif": ["Arial", "Helvetica", "Liberation Sans"],
-        "font.size": 11,
-        "axes.titlesize": 11,
-        "axes.labelsize": 11,
-        "xtick.labelsize": 9,
-        "ytick.labelsize": 9,
-        "legend.fontsize": 10,
-        "figure.titlesize": 13,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "axes.linewidth": 1.2,
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "font.size": 18,
+        "axes.titlesize": 18,
+        "axes.labelsize": 18,
+        "xtick.labelsize": 14,
+        "ytick.labelsize": 18,
+        "legend.fontsize": 18,
+        "figure.titlesize": 18,
+        "axes.linewidth": 1.5,
         "xtick.direction": "out",
         "ytick.direction": "out",
-        "xtick.major.width": 1.2,
-        "ytick.major.width": 1.2,
+        "xtick.major.width": 1.5,
+        "ytick.major.width": 1.5,
         "pdf.fonttype": 42,
         "svg.fonttype": "none",
         "savefig.bbox": "tight",
-        "savefig.dpi": 300,
+        "savefig.dpi": 600,
     }
 )
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn.functional as F
-from matplotlib.ticker import MaxNLocator
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,17 +59,6 @@ from method.dyn3d_sga.eval_utils import (  # noqa: E402
     resolve_device,
     set_seed,
 )
-
-PALETTE = [
-    "#2166AC",
-    "#B2182B",
-    "#1B7837",
-    "#F1A340",
-    "#762A83",
-    "#4393C3",
-    "#D6604D",
-    "#5AAE61",
-]
 
 
 def parse_args() -> argparse.Namespace:
@@ -114,7 +96,7 @@ def parse_args() -> argparse.Namespace:
         nargs="+",
         type=int,
         default=None,
-        help="Question IDs to plot. Defaults to first test IDs from checkpoint 1.",
+        help="Question IDs to plot. If omitted, randomly sample test IDs using --seed.",
     )
     parser.add_argument(
         "--num_questions",
@@ -125,8 +107,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--num_vectors",
         type=int,
-        default=5,
-        help="Number of SVD vectors to display (default: 5).",
+        default=32,
+        help="Number of leading SVD vectors to display (default: 32).",
     )
     parser.add_argument(
         "--no_instruction",
@@ -246,7 +228,7 @@ def question_hidden_state(
     use_instruction: bool,
     model_name: str,
 ) -> torch.Tensor:
-    """Get normalized hidden state at the final Q/A prompt token."""
+    """Get the raw hidden state at the final Q/A prompt token."""
     base = f"Q: {question} A:"
     if use_instruction:
         base = get_instruction(model_name) + "\n\n" + base
@@ -263,13 +245,14 @@ def question_hidden_state(
     hidden = outputs.hidden_states[index][:, -1, :].float()
     if hidden.shape[-1] == 0 or not torch.isfinite(hidden).all():
         raise ValueError(f"Non-finite/empty hidden state for question: {question!r}")
-    return F.normalize(hidden, dim=-1).to(device)
+    return hidden.to(device)
 
 
 def choose_question_ids(
     first_checkpoint: dict[str, Any],
     explicit_ids: list[int] | None,
     num_questions: int,
+    seed: int,
 ) -> list[int]:
     if explicit_ids is not None:
         if not explicit_ids:
@@ -289,7 +272,17 @@ def choose_question_ids(
             f"Checkpoint contains only {len(candidates)} test questions, "
             f"but --num_questions={num_questions}."
         )
-    return candidates[:num_questions]
+    rng = np.random.default_rng(seed)
+    selected = rng.choice(candidates, size=num_questions, replace=False)
+    return [int(question_id) for question_id in selected]
+
+
+def _centered_window(peak_index: int, rank: int, width: int) -> tuple[int, int]:
+    """Return a fixed-width [start, end) window centered near the peak."""
+    width = min(width, rank)
+    left = (width - 1) // 2
+    start = max(0, min(peak_index - left, rank - width))
+    return start, start + width
 
 
 def compute_weights(
@@ -303,11 +296,15 @@ def compute_weights(
     device: torch.device,
     use_instruction: bool,
     num_vectors: int,
-) -> np.ndarray:
-    rank_limit = min(num_vectors, max(item["rank"] for item in checkpoints))
-    weights = np.full(
-        (len(checkpoints), len(question_ids), rank_limit), np.nan, dtype=np.float32
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Select a contiguous window around each question's global router peak."""
+    width = min(num_vectors, min(item["rank"] for item in checkpoints))
+    weights = np.empty(
+        (len(checkpoints), len(question_ids), width), dtype=np.float32
     )
+    vector_indices = np.empty_like(weights, dtype=np.int64)
+    peak_indices = np.empty((len(checkpoints), len(question_ids)), dtype=np.int64)
+
     for q_idx, question_id in enumerate(question_ids):
         hidden = question_hidden_state(
             model,
@@ -325,12 +322,19 @@ def compute_weights(
                     f"!= checkpoint hidden dim {checkpoint['hidden_dim']}"
                 )
             with torch.inference_mode():
-                output = checkpoint["router"](hidden)
-            n = min(num_vectors, checkpoint["rank"])
-            weights[d_idx, q_idx, :n] = (
-                output[0, :n].detach().float().cpu().numpy()
+                full = torch.softmax(checkpoint["router"].logits(hidden), dim=-1)[0]
+            peak = int(torch.argmax(full).item())
+            window_start, window_end = _centered_window(
+                peak, checkpoint["rank"], width
             )
-    return weights
+            weights[d_idx, q_idx] = (
+                full[window_start:window_end].detach().float().cpu().numpy()
+            )
+            vector_indices[d_idx, q_idx] = np.arange(
+                window_start + 1, window_end + 1, dtype=np.int64
+            )
+            peak_indices[d_idx, q_idx] = peak + 1
+    return weights, vector_indices, peak_indices
 
 
 def write_tables(
@@ -339,6 +343,8 @@ def write_tables(
     labels: list[str],
     question_ids: list[int],
     weights: np.ndarray,
+    vector_indices: np.ndarray,
+    peak_indices: np.ndarray,
 ) -> None:
     """Write long-form CSV and a grouped JSON table."""
     csv_path = prefix.with_suffix(".csv")
@@ -355,14 +361,14 @@ def write_tables(
                                 labels[d_idx],
                                 str(checkpoint["path"]),
                                 question_id,
-                                v_idx + 1,
+                                int(vector_indices[d_idx, q_idx, v_idx]),
                                 f"{float(value):.9g}",
                             ]
                         )
     payload = {
         "experiment": "fig2_router_weights",
         "definition": (
-            "softmax(router(normalized hidden state at the final Q/A prompt "
+            "softmax(router.logits(raw hidden state at the final Q/A prompt "
             "token)); values correspond to SVD residual basis rows"
         ),
         "question_ids": question_ids,
@@ -372,11 +378,21 @@ def write_tables(
                 "checkpoint": str(checkpoint["path"]),
                 "rank": checkpoint["rank"],
                 "layer": checkpoint["layer"],
-                "weights": {
-                    str(question_id): [
-                        None if not np.isfinite(value) else float(value)
-                        for value in weights[d_idx, q_idx]
-                    ]
+                "questions": {
+                    str(question_id): {
+                        "window_start": int(vector_indices[d_idx, q_idx, 0]),
+                        "window_end": int(vector_indices[d_idx, q_idx, -1]),
+                        "peak_vector": int(peak_indices[d_idx, q_idx]),
+                        "vectors": [
+                            {
+                                "index": int(vector_index),
+                                "weight": float(value),
+                            }
+                            for vector_index, value in zip(
+                                vector_indices[d_idx, q_idx], weights[d_idx, q_idx]
+                            )
+                        ],
+                    }
                     for q_idx, question_id in enumerate(question_ids)
                 },
             }
@@ -388,71 +404,73 @@ def write_tables(
     )
 
 
+def _safe_label(label: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in label).strip("_")
+
+
 def build_figure(
     weights: np.ndarray,
     labels: list[str],
     question_ids: list[int],
+    vector_indices: np.ndarray,
+    peak_indices: np.ndarray,
     output_prefix: Path,
-) -> None:
-    """Draw one bar chart per (question, dataset) in a shared-y grid."""
-    n_datasets, n_questions, n_vectors_actual = weights.shape
-    figure, axes = plt.subplots(
-        n_questions,
-        n_datasets,
-        squeeze=False,
-        figsize=(max(3.2 * n_datasets, 4.0), max(2.45 * n_questions, 2.8)),
-        sharey=True,
-    )
-    x = np.arange(1, n_vectors_actual + 1)
-    ymax = float(np.nanmax(weights)) if np.isfinite(weights).any() else 1.0
-    ymax = min(1.0, max(0.20, ymax * 1.22 + 0.02))
-    for q_idx, question_id in enumerate(question_ids):
-        for d_idx, label in enumerate(labels):
-            ax = axes[q_idx, d_idx]
-            values = weights[d_idx, q_idx]
-            valid = np.isfinite(values)
-            ax.bar(
-                x[valid],
-                values[valid],
-                color=PALETTE[d_idx % len(PALETTE)],
-                width=0.72,
-                edgecolor="none",
-            )
-            ax.set_ylim(0, ymax)
-            ax.set_xlim(0.4, n_vectors_actual + 0.6)
-            ax.set_xticks(x)
-            ax.yaxis.set_major_locator(MaxNLocator(nbins=4))
-            ax.grid(False)
-            ax.tick_params(axis="x", length=0)
-            if q_idx == 0:
-                ax.set_title(label, fontweight="bold", pad=8)
-            if d_idx == 0:
-                ax.set_ylabel(f"Q{q_idx + 1}\nrouter weight")
-            if q_idx == n_questions - 1:
-                ax.set_xlabel("SVD vector")
-            ax.text(
-                0.02,
-                0.95,
-                f"id={question_id}",
-                transform=ax.transAxes,
-                ha="left",
-                va="top",
-                fontsize=8,
-                color="#444444",
-            )
-    figure.suptitle("dynSVD router weights on evaluation questions", y=1.01)
-    figure.subplots_adjust(
-        left=0.10,
-        right=0.995,
-        bottom=0.10,
-        top=0.92,
-        wspace=0.20,
-        hspace=0.34,
-    )
+) -> list[Path]:
+    """Draw one 5 x N router-weight heatmap for each checkpoint."""
+    n_datasets, n_questions, n_vectors = weights.shape
+    finite = weights[np.isfinite(weights)]
+    color_max = float(finite.max()) if finite.size else 1.0
+    color_max = max(color_max, 1e-8)
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
-    for suffix in (".png", ".pdf", ".svg"):
-        figure.savefig(output_prefix.with_suffix(suffix), bbox_inches="tight", dpi=300)
-    plt.close(figure)
+    outputs = []
+
+    for dataset_idx, label in enumerate(labels):
+        values = weights[dataset_idx]
+        figure, ax = plt.subplots(figsize=(10.45, 3.15))
+        image = ax.imshow(
+            values,
+            cmap="viridis",
+            vmin=0.0,
+            vmax=color_max,
+            aspect="auto",
+            interpolation="nearest",
+        )
+
+        # Five question rows, with thin separators matching the reference style.
+        ax.set_yticks(np.arange(n_questions))
+        row_labels = [
+            f"Q{i + 1}  V{vector_indices[dataset_idx, i, 0]}–"
+            f"V{vector_indices[dataset_idx, i, -1]}  "
+            f"(peak V{peak_indices[dataset_idx, i]})"
+            for i in range(n_questions)
+        ]
+        ax.set_yticklabels(row_labels)
+        tick_positions = sorted(set([0, *range(3, n_vectors, 4), n_vectors - 1]))
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels([str(i + 1) for i in tick_positions])
+        ax.set_xlabel(f"Position within each {n_vectors}-vector window")
+        ax.set_ylabel("Question")
+        ax.set_title("Router weights for five evaluation questions", pad=8)
+        ax.set_yticks(np.arange(-0.5, n_questions, 1), minor=True)
+        ax.grid(which="minor", axis="y", color="white", linewidth=1.5)
+        ax.tick_params(which="minor", left=False)
+        ax.tick_params(top=False, right=False)
+
+        colorbar = figure.colorbar(image, ax=ax, pad=0.015, fraction=0.035)
+        colorbar.set_label("Router weight")
+        colorbar.ax.tick_params(labelsize=13)
+        figure.subplots_adjust(left=0.25, right=0.91, bottom=0.24, top=0.84)
+
+        prefix = (
+            output_prefix
+            if n_datasets == 1
+            else output_prefix.with_name(f"{output_prefix.name}_{_safe_label(label)}")
+        )
+        for suffix in (".png", ".pdf", ".svg"):
+            figure.savefig(prefix.with_suffix(suffix), dpi=600, bbox_inches="tight")
+        outputs.append(prefix.with_suffix(".png"))
+        plt.close(figure)
+    return outputs
 
 
 def main() -> None:
@@ -475,7 +493,7 @@ def main() -> None:
             f"using layer={layer} for model inputs. Pass --layer to override."
         )
     question_ids = choose_question_ids(
-        checkpoints[0], args.question_ids, args.num_questions
+        checkpoints[0], args.question_ids, args.num_questions, args.seed
     )
     _, hf_dataset = load_truthfulqa_mc_dataframe(args.csv_path)
     questions = {}
@@ -486,7 +504,7 @@ def main() -> None:
             )
         questions[question_id] = str(hf_dataset[question_id]["question"])
     model, tokenizer = load_model(args.model_name, args.model_dir, device, args.dtype)
-    weights = compute_weights(
+    weights, vector_indices, peak_indices = compute_weights(
         checkpoints,
         question_ids,
         questions,
@@ -499,12 +517,17 @@ def main() -> None:
         args.num_vectors,
     )
     prefix = Path(args.output_prefix)
-    write_tables(prefix, checkpoints, labels, question_ids, weights)
-    build_figure(weights, labels, question_ids, prefix)
+    write_tables(
+        prefix, checkpoints, labels, question_ids,
+        weights, vector_indices, peak_indices,
+    )
+    figure_paths = build_figure(
+        weights, labels, question_ids, vector_indices, peak_indices, prefix
+    )
     print(f"Questions: {question_ids}")
     print(f"Datasets: {labels}")
     print(f"Router weights: {prefix.with_suffix('.csv')}")
-    print(f"Figure: {prefix.with_suffix('.png')}")
+    print("Figures: " + ", ".join(str(path) for path in figure_paths))
 
 
 if __name__ == "__main__":
