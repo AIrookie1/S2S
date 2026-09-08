@@ -13,8 +13,8 @@ def main() -> None:
     p.add_argument("--positive_mode", choices=["mean", "mc1"], default="mean", help="Construct training pairs from answer-level activations using mean MC2 positives or one MC1 positive.")
     p.add_argument("--energy", type=float, default=.95, help="Cumulative squared-singular-value energy target in (0, 1]; used when --rank is omitted."); p.add_argument("--num_folds", type=int, default=2); p.add_argument("--fold_idx", type=int, default=0); p.add_argument("--val_fraction", type=float, default=0.2, help="Question-level validation fraction within the selected fold (default 0.2)."); p.add_argument("--router_hidden", type=int, default=256); p.add_argument("--scale_loss_weight", type=float, default=1.0, help="Weight of scale-vs-vector-norm MSE loss."); p.add_argument("--cosine_loss_weight", type=float, default=1.0, help="Weight of cosine-direction loss."); p.add_argument("--use_zpos_router", type=int, choices=[0, 1], default=1, help="Legacy z+ switch; overridden by use_data_mode."); p.add_argument("--use_data_mode", type=int, choices=[0, 1, 2, 3], default=0, help="0=neg, 1=neg+pos, 2=neg+auxiliary interpolation, 3=neg+pos+auxiliary interpolation."); p.add_argument("--aux_interp_count", type=int, default=1, help="Number of random interpolation samples per pair when mode 2/3 is selected."); p.add_argument("--epochs", type=int, default=20); p.add_argument("--batch_size", type=int, default=128); p.add_argument("--learning_rate", "--lr", type=float, default=1e-3); p.add_argument("--device", choices=["cuda", "cpu"], default="cuda"); p.add_argument("--seed", type=int, default=42)
     args = p.parse_args(); hneg, hpos, q, meta = load_feature_pairs(args.feature_path, positive_mode=args.positive_mode)
-    if args.num_folds != 2 or not 0 <= args.fold_idx < args.num_folds:
-        raise ValueError("this two-fold router split requires --num_folds 2 and fold_idx in {0,1}")
+    if args.num_folds < 1 or not 0 <= args.fold_idx < args.num_folds:
+        raise ValueError("num_folds must be positive and fold_idx must be in range")
     if not 0.0 < args.val_fraction < 1.0:
         raise ValueError("val_fraction must be in (0, 1)")
     if "train_q_indices" in meta and "test_q_indices" in meta:
@@ -25,7 +25,11 @@ def main() -> None:
     else:
         questions = np.unique(q); folds = np.array_split(questions, args.num_folds)
         selected_q = np.asarray(folds[args.fold_idx], dtype=np.int64)
-        heldout_q = np.concatenate([folds[i] for i in range(args.num_folds) if i != args.fold_idx]).astype(np.int64)
+        heldout_folds = [folds[i] for i in range(args.num_folds) if i != args.fold_idx]
+        heldout_q = (
+            np.concatenate(heldout_folds).astype(np.int64)
+            if heldout_folds else np.empty(0, dtype=np.int64)
+        )
     if len(selected_q) < 2:
         raise ValueError("selected fold must contain at least two questions for an 8:2 split")
     # Only the selected fold is used. Split its questions deterministically

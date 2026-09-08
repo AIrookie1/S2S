@@ -82,12 +82,18 @@ def load_feature_pairs(path: str | Path, positive_mode: str = "mean") -> tuple[n
         raise ValueError("positive_mode must be one of: mean, mc1, cartesian")
     data = np.load(path, allow_pickle=False)
     keys = set(data.files)
-    if positive_mode in {"mean", "mc1"} and {"activations", "labels", "q_indices", "choice_indices"}.issubset(keys):
+    if positive_mode in {"mean", "mc1"} and {"activations", "labels", "q_indices"}.issubset(keys):
         activations = np.asarray(data["activations"], np.float32)
         labels = np.asarray(data["labels"]).reshape(-1)
         q_indices = np.asarray(data["q_indices"]).reshape(-1)
-        choice_indices = np.asarray(data["choice_indices"]).reshape(-1)
+        # Generic MC features do not need dataset-specific choice indices;
+        # pair construction only requires question grouping and binary labels.
+        choice_indices = np.asarray(
+            data["choice_indices"] if "choice_indices" in keys else np.arange(len(labels))
+        ).reshape(-1)
         if positive_mode == "mc1":
+            if "choices" not in keys:
+                raise ValueError("positive_mode='mc1' requires a choices field")
             from datasets import load_dataset
             dataset = load_dataset("truthful_qa", "multiple_choice")["validation"]
             mc1_by_question = {}

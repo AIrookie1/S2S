@@ -1,5 +1,5 @@
 """
-Evaluate MC tasks with Spherical Steering.
+Evaluate MC tasks with Similarity-Graph Adaptive 3D Steering.
 
 Evaluation logic (MC1 style):
   1. For each question, construct full prompts for ALL options.
@@ -11,9 +11,7 @@ Supported datasets: COPA, StoryCloze, MMLU, Winogrande, BoolQ
 
 Usage:
     python evaluate_generic.py --model_name llama3.1-8B --dataset copa --layer 14 \
-        --prototype_path ./prototypes_generic/xxx.npz --alpha 0.3 --beta -0.2
-    python evaluate_generic.py --model_name llama3.1-8B --dataset mmlu_global --layer 14 \
-        --prototype_path ./prototypes_generic/xxx.npz --alpha 0.3 --beta -0.2
+        --checkpoint_path ./checkpoints_generic/copa_dyn3d.npz
 """
 
 import argparse
@@ -27,9 +25,11 @@ from datasets import load_dataset, concatenate_datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from baukit import TraceDict
 
-# spherical_steering.py lives in parent directory (ICML2026/)
+# Keep the original dataset and scoring implementation; only the steering
+# hook is replaced by the project's Dyn3D method.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from method.spherical_steering.steering import get_spherical_intervention
+from method.dyn3d_sga.evaluate_dynSVD import load_components
+from method.dyn3d_sga.evaluate_3d_dyn import get_3d_dynamic_intervention
 from utils_generic import HF_NAMES, MMLU_CATEGORIES, set_seed
 
 
@@ -308,16 +308,16 @@ def evaluate_boolq(model, tokenizer, hook_fn, layer_name, device, steering_stats
 # ============================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate MC tasks with Spherical Steering")
+    parser = argparse.ArgumentParser(description="Evaluate MC tasks with Dyn3D steering")
     parser.add_argument('--model_name', type=str, default='llama3.1-8B-Instruct',
                         help=f"Model name or path. Shortcuts: {list(HF_NAMES.keys())}")
     parser.add_argument('--dataset', type=str, required=True,
                         choices=['copa', 'storycloze', 'mmlu_global', 'winogrande', 'boolq'])
     parser.add_argument('--layer', type=int, default=14)
-    parser.add_argument('--prototype_path', type=str, required=True)
-    parser.add_argument('--kappa', type=float, default=20.0)
-    parser.add_argument('--alpha', type=float, default=0.3)
-    parser.add_argument('--beta', type=float, default=-0.2)
+    parser.add_argument('--checkpoint_path', type=str, required=True)
+    parser.add_argument('--weight_kappa', type=float, default=5.0)
+    parser.add_argument('--weight_temperature', type=float, default=0.1)
+    parser.add_argument('--use_gate', type=int, choices=[0, 1], default=1)
     parser.add_argument('--disable_steering', action='store_true')
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
@@ -334,23 +334,35 @@ def main():
         model_path, torch_dtype=torch.float16, device_map="auto", trust_remote_code=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Load prototypes
-    print(f"Loading prototypes: {args.prototype_path}")
-    data = np.load(args.prototype_path)
-    mu_T = torch.tensor(data['mu_T'], dtype=torch.float32, device=device)
-    mu_H = torch.tensor(data['mu_H'], dtype=torch.float32, device=device)
+    # Load the Dyn3D checkpoint trained on this dataset's original training split.
+    print(f"Loading Dyn3D checkpoint: {args.checkpoint_path}")
+    _, avg, basis, router, scale_net = load_components(
+        args.checkpoint_path, torch.device(device)
+    )
 
-    # Setup steering hook
+    # Setup steering hook. Dataset loading, prompts, option scoring and metrics
+    # remain identical to the original generic evaluator.
     layer_name = f"model.layers.{args.layer}"
-    steering_stats = {'total': 0, 'steered': 0}
+    steering_stats = {'total': 0, 'steered': 0, 'weight_count': 0}
 
     if args.disable_steering:
         print(">> Mode: BASELINE (No Steering)")
         hook_fn = None
     else:
-        print(f">> Mode: STEERING (kappa={args.kappa}, alpha={args.alpha}, beta={args.beta})")
-        hook_fn = get_spherical_intervention(
-            mu_T, mu_H, args.kappa, args.alpha, args.beta, stats=steering_stats)
+        print(
+            f">> Mode: DYN3D (kappa={args.weight_kappa}, "
+            f"temperature={args.weight_temperature}, gate={args.use_gate})"
+        )
+        hook_fn = get_3d_dynamic_intervention(
+            avg,
+            basis,
+            router,
+            scale_net,
+            weight_kappa=args.weight_kappa,
+            weight_temperature=args.weight_temperature,
+            use_gate=bool(args.use_gate),
+            stats=steering_stats,
+        )
 
     # Dispatch evaluation
     if args.dataset == 'copa':
@@ -373,7 +385,10 @@ def main():
     print(f"Layer:      {args.layer}")
     print(f"Steering:   {'OFF' if args.disable_steering else 'ON'}")
     if not args.disable_steering:
-        print(f"Parameters: kappa={args.kappa}, alpha={args.alpha}, beta={args.beta}")
+        print(
+            f"Parameters: kappa={args.weight_kappa}, "
+            f"temperature={args.weight_temperature}, gate={args.use_gate}"
+        )
         if steering_stats['total'] > 0:
             steer_pct = steering_stats['steered'] / steering_stats['total'] * 100
             print(f"Stats:      Steered={steering_stats['steered']}/{steering_stats['total']} ({steer_pct:.1f}%)")

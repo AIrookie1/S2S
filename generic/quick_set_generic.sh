@@ -2,34 +2,61 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
 
-MODEL="llama3.1-8B-Instruct"
-FEATURE_DIR="./features_generic"
-PROTO_DIR="./prototypes_generic"
-KAPPA=20
+PYTHON_BIN=/root/miniconda3/envs/py310/bin/python
+MODEL=llama3.1-8B-Instruct
+MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
+GPU=0
 
-# BoolQ | layer 12 | alpha 0.5 | beta -1.0
-python get_activations_generic.py --model_name "$MODEL" --dataset boolq --split train --layer 12 --save_dir "$FEATURE_DIR"
-python get_prototypes_generic.py --feature_file "$FEATURE_DIR/${MODEL}_boolq_train_l12.npz" --save_dir "$PROTO_DIR"
-python evaluate_generic.py --model_name "$MODEL" --dataset boolq --layer 12 --prototype_path "$PROTO_DIR/${MODEL}_boolq_train_l12_proto.npz" --kappa "$KAPPA" --alpha 0.5 --beta -1.0
+FEATURE_DIR=./features_generic
+CHECKPOINT_DIR=./checkpoints_generic
+WEIGHT_KAPPA=5.0
+WEIGHT_TEMPERATURE=0.1
+USE_GATE=0
 
-# COPA | layer 16 | alpha 0.9 | beta -0.4
-python get_activations_generic.py --model_name "$MODEL" --dataset copa --split train --layer 16 --save_dir "$FEATURE_DIR"
-python get_prototypes_generic.py --feature_file "$FEATURE_DIR/${MODEL}_copa_train_l16.npz" --save_dir "$PROTO_DIR"
-python evaluate_generic.py --model_name "$MODEL" --dataset copa --layer 16 --prototype_path "$PROTO_DIR/${MODEL}_copa_train_l16_proto.npz" --kappa "$KAPPA" --alpha 0.9 --beta -0.4
+# Dyn3D training
+SVD_ENERGY=0.90
+ROUTER_HIDDEN=256
+EPOCHS=2000
+BATCH_SIZE=256
+LEARNING_RATE=0.001
+VAL_FRACTION=0.70
 
-# StoryCloze | layer 27 | alpha 0.9 | beta -0.7
-python get_activations_generic.py --model_name "$MODEL" --dataset storycloze --split train --layer 27 --save_dir "$FEATURE_DIR"
-python get_prototypes_generic.py --feature_file "$FEATURE_DIR/${MODEL}_storycloze_train_l27.npz" --save_dir "$PROTO_DIR"
-python evaluate_generic.py --model_name "$MODEL" --dataset storycloze --layer 27 --prototype_path "$PROTO_DIR/${MODEL}_storycloze_train_l27_proto.npz" --kappa "$KAPPA" --alpha 0.9 --beta -0.7
+mkdir -p "$FEATURE_DIR" "$CHECKPOINT_DIR"
 
-# MMLU Global | layer 28 | alpha 0.8 | beta -0.1
-python get_activations_generic.py --model_name "$MODEL" --dataset mmlu_global --split train --layer 28 --save_dir "$FEATURE_DIR"
-python get_prototypes_generic.py --feature_file "$FEATURE_DIR/${MODEL}_mmlu_global_train_l28.npz" --save_dir "$PROTO_DIR"
-python evaluate_generic.py --model_name "$MODEL" --dataset mmlu_global --layer 28 --prototype_path "$PROTO_DIR/${MODEL}_mmlu_global_train_l28_proto.npz" --kappa "$KAPPA" --alpha 0.8 --beta -0.1
+run_dataset() {
+  local dataset="$1"
+  local layer="$2"
+  local feature="$FEATURE_DIR/${MODEL}_${dataset}_train_l${layer}.npz"
+  local checkpoint="$CHECKPOINT_DIR/${MODEL}_${dataset}_l${layer}_dyn3d.npz"
 
-# Winogrande | layer 16 | alpha 0.9 | beta -0.8
-python get_activations_generic.py --model_name "$MODEL" --dataset winogrande --split train --layer 16 --save_dir "$FEATURE_DIR"
-python get_prototypes_generic.py --feature_file "$FEATURE_DIR/${MODEL}_winogrande_train_l16.npz" --save_dir "$PROTO_DIR"
-python evaluate_generic.py --model_name "$MODEL" --dataset winogrande --layer 16 --prototype_path "$PROTO_DIR/${MODEL}_winogrande_train_l16_proto.npz" --kappa "$KAPPA" --alpha 0.9 --beta -0.8
+  echo "=== $dataset | layer=$layer | extract ==="
+  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/get_activations_generic.py \
+    --model_name "$MODEL" --model_dir "$MODEL_DIR" \
+    --dataset "$dataset" --split train --layer "$layer" --save_dir "$FEATURE_DIR"
+
+  echo "=== $dataset | layer=$layer | train Dyn3D ==="
+  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py \
+    --feature_path "$feature" --output_path "$checkpoint" \
+    --positive_mode mean --num_folds 1 --fold_idx 0 \
+    --energy "$SVD_ENERGY" --router_hidden "$ROUTER_HIDDEN" \
+    --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" \
+    --learning_rate "$LEARNING_RATE" --val_fraction "$VAL_FRACTION" \
+    --device cuda
+
+  echo "=== $dataset | layer=$layer | evaluate ==="
+  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/evaluate_generic.py \
+    --model_name "$MODEL" --model_dir "$MODEL_DIR" \
+    --dataset "$dataset" --layer "$layer" --checkpoint_path "$checkpoint" \
+    --weight_kappa "$WEIGHT_KAPPA" \
+    --weight_temperature "$WEIGHT_TEMPERATURE" --use_gate "$USE_GATE"
+}
+
+# Keep the layers and benchmark settings from the original generic pipeline.
+run_dataset boolq 12
+run_dataset copa 16
+run_dataset storycloze 27
+run_dataset mmlu_global 28
+run_dataset winogrande 16
