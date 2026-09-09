@@ -110,8 +110,7 @@ def slerp(x, y, t, eps=1e-8, small_angle_threshold=1e-4):
         torch.sin((1 - t_tensor) * theta) / sin_theta.clamp_min(eps) * x
         + torch.sin(t_tensor * theta) / sin_theta.clamp_min(eps) * y
     )
-    linear = norm((1 - t_tensor) * x + t_tensor * y, eps)
-    return result#torch.where(theta.abs() < small_angle_threshold, linear, result)
+    return result
 
 
 def two_slerp(a, b, c, wa, wb, wc, eps, small_angle_threshold):
@@ -177,13 +176,14 @@ def get_3d_dynamic_intervention(
                 hidden.shape[1] - 1,
             ),
         )
-        z = hidden[:, start, :].float()
-        coeff = torch.softmax(router.logits(hidden[:, -1, :].float()), dim=-1)
-        # coeff = torch.softmax(router.logits(z.float()), dim=-1)
-        residual = normalize_basis_combination(coeff, basis).float()
         original = hidden[:, start:, :].float()
         original_norm = torch.linalg.vector_norm(original, dim=-1, keepdim=True).clamp_min(eps)
+        # Normalize the active hidden sequence once. Reuse its final token as
+        # the router input so router and spherical geometry see the same unit
+        # representation as training.
         a = norm(original, eps)
+        coeff = torch.softmax(router.logits(a[:, -1, :]), dim=-1)
+        residual = normalize_basis_combination(coeff, basis).float()
         b = mean_direction.view(1, 1, -1).expand_as(a)
         c = residual.view(residual.shape[0], 1, -1).expand_as(a)
         alpha, beta, gamma, weight_info = adaptive_3way_weights(

@@ -1,7 +1,7 @@
 {
   "dataset": "copa",
   "metric": "MC1",
-  "MC1": 0.72,
+  "MC1": 0.88,
   "model_name": "llama3.1-8B-Instruct",
   "layer": 16,
   "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_copa_l16_dyn3d.npz",
@@ -16,9 +16,9 @@
     "steered_tokens": 1531,
     "total_tokens": 1531,
     "mean_adaptive_weights": {
-      "alpha": 0.10197989300993204,
-      "beta": 0.3502625450832559,
-      "gamma": 0.547757562899574
+      "alpha": 0.5841081703044012,
+      "beta": 0.1744640702752799,
+      "gamma": 0.24142774238763956
     }
   }
 }

@@ -1,0 +1,56 @@
+{
+  "experiment": "fig3a_svd_rank_mc1",
+  "method": "Similarity-Graph Adaptive 3D Spherical Steering",
+  "x_axis": "SVD_RANK",
+  "y_axis": "MC1",
+  "results": [
+    {
+      "svd_rank": 10,
+      "MC1": 0.6053921568627451,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank10.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank10_eval.json"
+    },
+    {
+      "svd_rank": 20,
+      "MC1": 0.6323529411764706,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank20.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank20_eval.json"
+    },
+    {
+      "svd_rank": 30,
+      "MC1": 0.5955882352941176,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank30.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank30_eval.json"
+    },
+    {
+      "svd_rank": 40,
+      "MC1": 0.6151960784313726,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank40.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank40_eval.json"
+    },
+    {
+      "svd_rank": 50,
+      "MC1": 0.5857843137254902,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank50.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank50_eval.json"
+    },
+    {
+      "svd_rank": 60,
+      "MC1": 0.5759803921568627,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank60.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank60_eval.json"
+    },
+    {
+      "svd_rank": 70,
+      "MC1": 0.5343137254901961,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank70.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank70_eval.json"
+    },
+    {
+      "svd_rank": 80,
+      "MC1": 0.5220588235294118,
+      "checkpoint": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/checkpoints/llama3.1-8B-Instruct_layer14_rank80.npz",
+      "evaluation": "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/experiments/fig3a/results/rank80_eval.json"
+    }
+  ]
+}

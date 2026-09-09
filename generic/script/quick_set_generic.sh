@@ -20,15 +20,15 @@ run_dataset() {
   # Dataset-specific model, training, and evaluation parameters.
   # Add or adjust a dataset block without affecting the others.
   local MODEL MODEL_DIR WEIGHT_KAPPA WEIGHT_TEMPERATURE USE_GATE
-  local SVD_ENERGY ROUTER_HIDDEN EPOCHS BATCH_SIZE LEARNING_RATE VAL_FRACTION
+  local SVD_RANK ROUTER_HIDDEN EPOCHS BATCH_SIZE LEARNING_RATE VAL_FRACTION
   local SCALE_LOSS_WEIGHT COSINE_LOSS_WEIGHT POSITIVE_MODE USE_DATA_MODE AUX_INTERP_COUNT
   local HIDDEN_PRIOR MEAN_PRIOR RESIDUAL_PRIOR
   case "$dataset" in
     boolq)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      WEIGHT_KAPPA=1e2; WEIGHT_TEMPERATURE=1; USE_GATE=1
-      SVD_ENERGY=0.99; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      WEIGHT_KAPPA=1e3; WEIGHT_TEMPERATURE=1; USE_GATE=0
+      SVD_RANK=25; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
       LEARNING_RATE=0.001; VAL_FRACTION=0.20
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.03
       POSITIVE_MODE=mean; USE_DATA_MODE=0; AUX_INTERP_COUNT=8
@@ -37,8 +37,8 @@ run_dataset() {
     copa)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      WEIGHT_KAPPA=1e2; WEIGHT_TEMPERATURE=1; USE_GATE=1
-      SVD_ENERGY=0.99; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      WEIGHT_KAPPA=1e3; WEIGHT_TEMPERATURE=1; USE_GATE=0
+      SVD_RANK=25; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
       LEARNING_RATE=0.001; VAL_FRACTION=0.20
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.03
       POSITIVE_MODE=mean; USE_DATA_MODE=0; AUX_INTERP_COUNT=8
@@ -47,8 +47,8 @@ run_dataset() {
     storycloze|mmlu_global|winogrande)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      WEIGHT_KAPPA=1e2; WEIGHT_TEMPERATURE=1; USE_GATE=1
-      SVD_ENERGY=0.99; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      WEIGHT_KAPPA=1e3; WEIGHT_TEMPERATURE=1; USE_GATE=1
+      SVD_RANK=25; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
       LEARNING_RATE=0.001; VAL_FRACTION=0.20
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.03
       POSITIVE_MODE=mean; USE_DATA_MODE=0; AUX_INTERP_COUNT=8
@@ -71,7 +71,7 @@ run_dataset() {
   CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py \
     --feature_path "$feature" --output_path "$checkpoint" \
     --positive_mode "$POSITIVE_MODE" --num_folds 1 --fold_idx 0 \
-    --energy "$SVD_ENERGY" --router_hidden "$ROUTER_HIDDEN" \
+    --rank "$SVD_RANK" --router_hidden "$ROUTER_HIDDEN" \
     --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" \
     --learning_rate "$LEARNING_RATE" --val_fraction "$VAL_FRACTION" \
     --scale_loss_weight "$SCALE_LOSS_WEIGHT" --cosine_loss_weight "$COSINE_LOSS_WEIGHT" \
@@ -88,8 +88,8 @@ run_dataset() {
   echo "MC result saved: $mc_result"
 }
 
-# run_dataset boolq 12
-# run_dataset copa 16
-# run_dataset storycloze 27
-run_dataset mmlu_global 28
-# run_dataset winogrande 16
+run_dataset boolq 12
+run_dataset copa 16
+run_dataset storycloze 27
+# run_dataset mmlu_global 28
+run_dataset winogrande 16

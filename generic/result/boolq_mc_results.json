@@ -1,14 +1,14 @@
 {
   "dataset": "boolq",
   "metric": "MC1",
-  "MC1": 0.7470948012232416,
+  "MC1": 0.8009174311926606,
   "model_name": "llama3.1-8B-Instruct",
   "layer": 12,
   "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_boolq_l12_dyn3d.npz",
   "steering_enabled": true,
   "parameters": {
     "weight_kappa": 100.0,
-    "weight_temperature": 0.1,
+    "weight_temperature": 1.0,
     "use_gate": false,
     "seed": 42
   },
@@ -16,9 +16,9 @@
     "steered_tokens": 13080,
     "total_tokens": 13080,
     "mean_adaptive_weights": {
-      "alpha": 0.5885080607299057,
-      "beta": 0.2244851060905324,
-      "gamma": 0.18700682940777802
+      "alpha": 0.5043551682799325,
+      "beta": 0.32398370755466116,
+      "gamma": 0.1716611056198403
     }
   }
 }

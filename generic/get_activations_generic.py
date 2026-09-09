@@ -66,7 +66,7 @@ def main():
     print(f"\n=== Data Statistics ===")
     print(f"Total samples: {len(prompts)}")
     print(f"Correct (label=1): {sum(labels)}, Incorrect (label=0): {len(labels) - sum(labels)}")
-    print(f"Example prompt: {prompts[0][:10]}...")
+    # print(f"Example prompt: {prompts[0][:10]}...")
 
     # 3. Extract Features
     activations = get_layer_activations(model, tokenizer, prompts, args.layer, device)

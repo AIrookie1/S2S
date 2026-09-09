@@ -174,11 +174,12 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             "(bfloat16/float32); refusing to start SVD."
         )
     dev = torch.device(device if device != "cuda" or torch.cuda.is_available() else "cpu")
-    # Keep the original hidden-state magnitudes.  The residual is defined by
-    # subtracting the raw positive and negative representations directly.
-    neg = torch.as_tensor(h_neg, dtype=torch.float32, device=dev)
-    pos = torch.as_tensor(h_pos, dtype=torch.float32, device=dev)
-    vectors = pos - neg
+    # Work on the unit sphere throughout the geometric objective. The
+    # router/ScaleNet inputs are unit hidden states, and each positive-negative
+    # difference is converted to a unit direction before mean/SVD geometry.
+    neg = F.normalize(torch.as_tensor(h_neg, dtype=torch.float32, device=dev), p=2, dim=-1, eps=1e-8)
+    pos = F.normalize(torch.as_tensor(h_pos, dtype=torch.float32, device=dev), p=2, dim=-1, eps=1e-8)
+    vectors = F.normalize(pos - neg, p=2, dim=-1, eps=1e-8)
     # ``train_mask`` is used only for the geometric quantities (mean and SVD
     # residual basis). The optional router mask is the held-out validation
     # question split used to fit the router and ScaleNet.
@@ -187,8 +188,9 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
     router_tr = tr if router_mask is None else torch.as_tensor(router_mask, dtype=torch.bool, device=dev)
     if int(tr.sum()) == 0 or int(mean_tr.sum()) == 0 or int(router_tr.sum()) == 0:
         raise ValueError("geometry, mean, and router masks must all be non-empty")
-    v_avg = vectors[mean_tr].mean(0)
-    residual = vectors[tr] - v_avg
+    v_avg = F.normalize(vectors[mean_tr].mean(0), p=2, dim=0, eps=1e-8)
+    residual_delta = vectors[tr] - v_avg
+    residual = F.normalize(residual_delta, p=2, dim=-1, eps=1e-8)
     # SVD uses the complete selected fold, while v_avg uses only mean_tr
     # (the 80% within-fold subset). Auxiliary samples are excluded from both.
     print(
@@ -233,6 +235,9 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
     router_inputs = torch.cat(sample_inputs, dim=0)
     router_dyn_targets = torch.cat(sample_dyn_targets, dim=0)
     router_residual_targets = torch.cat(sample_residual_targets, dim=0)
+    # Fixed direction targets are normalized once and reused across epochs;
+    # magnitudes remain in router_residual_targets for the scale loss.
+    router_target_directions = F.normalize(router_dyn_targets, p=2, dim=-1, eps=1e-8)
     router_sample_type = torch.cat(sample_types, dim=0)
     aux_router_samples = int((router_sample_type == 2).sum().item())
     router_is_positive = router_sample_type == 1
@@ -250,7 +255,10 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             scale = scale_net(router_inputs[idx])
             routed_direction = normalize_basis_combination(coeff, basis)
             dyn = v_avg + scale[:, None] * routed_direction
-            vector_mse_batch = F.mse_loss(dyn, router_dyn_targets[idx])
+            # Compare unit directions, matching the inference geometry.
+            dyn_direction = F.normalize(dyn, p=2, dim=-1, eps=1e-8)
+            target_direction = router_target_directions[idx]
+            vector_mse_batch = F.mse_loss(dyn_direction, target_direction)
             # print(torch.linalg.vector_norm(router_residual_targets[idx], dim=-1))
             scale_mse_batch = F.mse_loss(scale, torch.linalg.vector_norm(router_residual_targets[idx], dim=-1))
             # Preserve cosine loss for z- inputs. z+ has a zero direction
@@ -259,7 +267,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             cosine_terms = []
             if (~is_pos).any():
                 cosine_terms.append(1.0 - F.cosine_similarity(
-                    dyn[~is_pos], router_dyn_targets[idx][~is_pos], dim=-1
+                    dyn_direction[~is_pos], target_direction[~is_pos], dim=-1
                 ))
             cosine_loss_batch = (torch.cat(cosine_terms).mean()
                                  if cosine_terms else torch.zeros((), device=dev))
@@ -278,9 +286,11 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             scale = scale_net(router_inputs)
             routed_direction = normalize_basis_combination(coeff, basis)
             dyn = v_avg + scale[:, None] * routed_direction
-            vector_mse = float(F.mse_loss(dyn, router_dyn_targets).cpu())
+            dyn_direction = F.normalize(dyn, p=2, dim=-1, eps=1e-8)
+            target_direction = router_target_directions
+            vector_mse = float(F.mse_loss(dyn_direction, target_direction).cpu())
             cosine_mask = ~router_is_positive
-            cosine_loss = float((1.0 - F.cosine_similarity(dyn[cosine_mask], router_dyn_targets[cosine_mask], dim=-1)).mean().cpu())
+            cosine_loss = float((1.0 - F.cosine_similarity(dyn_direction[cosine_mask], target_direction[cosine_mask], dim=-1)).mean().cpu())
             residual_mag = float(
                 torch.linalg.vector_norm(
                     scale[:, None] * routed_direction, dim=-1

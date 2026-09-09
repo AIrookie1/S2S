@@ -20,7 +20,7 @@ run_dataset() {
   # Dataset-specific model, training, and evaluation parameters.
   # Add or adjust a dataset block without affecting the others.
   local MODEL MODEL_DIR WEIGHT_KAPPA WEIGHT_TEMPERATURE USE_GATE
-  local SVD_ENERGY ROUTER_HIDDEN EPOCHS BATCH_SIZE LEARNING_RATE VAL_FRACTION
+  local SVD_RANK ROUTER_HIDDEN EPOCHS BATCH_SIZE LEARNING_RATE VAL_FRACTION
   local SCALE_LOSS_WEIGHT COSINE_LOSS_WEIGHT POSITIVE_MODE USE_DATA_MODE AUX_INTERP_COUNT
   local HIDDEN_PRIOR MEAN_PRIOR RESIDUAL_PRIOR
   case "$dataset" in
@@ -28,7 +28,7 @@ run_dataset() {
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
       WEIGHT_KAPPA=1e2; WEIGHT_TEMPERATURE=1; USE_GATE=0
-      SVD_ENERGY=0.8; ROUTER_HIDDEN=1024; EPOCHS=400; BATCH_SIZE=256
+      SVD_RANK=25; ROUTER_HIDDEN=1024; EPOCHS=400; BATCH_SIZE=256
       LEARNING_RATE=0.001; VAL_FRACTION=0.2
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.3
       POSITIVE_MODE=mean; USE_DATA_MODE=0; AUX_INTERP_COUNT=4
@@ -41,16 +41,16 @@ run_dataset() {
   local mc_result="$MC_RESULT_DIR/${dataset}_mc_results.json"
 
   echo "=== $dataset | layer=$layer | extract ==="
-  Uncomment to regenerate activations when the feature file is missing or outdated.
-  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/get_activations_generic.py \
-    --model_name "$MODEL" --model_dir "$MODEL_DIR" \
-    --dataset "$dataset" --split train --layer "$layer" --save_dir "$FEATURE_DIR"
+  #Uncomment to regenerate activations when the feature file is missing or outdated.
+  # CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/get_activations_generic.py \
+  #   --model_name "$MODEL" --model_dir "$MODEL_DIR" \
+  #   --dataset "$dataset" --split train --layer "$layer" --save_dir "$FEATURE_DIR"
 
   echo "=== $dataset | layer=$layer | train Dyn3D ==="
   CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py \
     --feature_path "$feature" --output_path "$checkpoint" \
     --positive_mode "$POSITIVE_MODE" --num_folds 1 --fold_idx 0 \
-    --energy "$SVD_ENERGY" --router_hidden "$ROUTER_HIDDEN" \
+    --rank "$SVD_RANK" --router_hidden "$ROUTER_HIDDEN" \
     --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" \
     --learning_rate "$LEARNING_RATE" --val_fraction "$VAL_FRACTION" \
     --scale_loss_weight "$SCALE_LOSS_WEIGHT" --cosine_loss_weight "$COSINE_LOSS_WEIGHT" \
