@@ -145,7 +145,6 @@ def main():
     parser.add_argument("--info_judge_path", required=True)
     parser.add_argument("--max_new_tokens", type=int, default=50)
     parser.add_argument("--weight_kappa", type=float, default=5.0)
-    parser.add_argument("--weight_temperature", type=float, default=0.1)
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--disable_steering", action="store_true")
     args = parser.parse_args()
@@ -174,7 +173,6 @@ def main():
             router,
             scale_net,
             weight_kappa=args.weight_kappa,
-            weight_temperature=args.weight_temperature,
         )
 
     print(f"Generating paired answers: {len(test_ids)} questions")
@@ -229,7 +227,6 @@ def main():
         "checkpoint_path": args.checkpoint_path,
         "parameters": {
             "weight_kappa": args.weight_kappa,
-            "weight_temperature": args.weight_temperature,
             "steering_enabled": not args.disable_steering,
             "max_new_tokens": args.max_new_tokens,
         },

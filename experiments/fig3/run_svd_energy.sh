@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+
 FIG3_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$FIG3_DIR/../../script/common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/model_config.sh"
 
 GPU=1
 
@@ -13,7 +17,7 @@ NUM_FOLDS=2
 POSITIVE_MODE=mean
 
 # SVD geometry and router training: same settings as run_3d_train.sh
-VAL_FRACTION=0.50
+VAL_FRACTION=0.5
 ROUTER_HIDDEN=256
 EPOCHS=2000
 BATCH_SIZE=256
@@ -24,11 +28,10 @@ SEED=42
 DEVICE=cuda
 
 # dyn3d evaluation: same settings as run_3d_eval.sh
-WEIGHT_KAPPA=1e2
-WEIGHT_TEMPERATURE=1.0
+WEIGHT_KAPPA=1e3
 EVAL_SPLIT=test
 DTYPE=float16
-MODEL_DIR="${MODEL_DIR:-/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct}"
+MODEL_DIR="${MODEL_DIR:-$EXP_MODEL_DIR}"
 
 FEATURE_PATH="$FEATURE_DIR/${MODEL}_layer${LAYER}.npz"
 CHECKPOINT_DIR="$FIG3_DIR/checkpoints"
@@ -63,6 +66,7 @@ for SVD_ENERGY in "${SVD_ENERGIES[@]}"; do
     --seed "$SEED" \
     --scale_loss_weight "$SCALE_LOSS_WEIGHT" \
     --cosine_loss_weight "$COSINE_LOSS_WEIGHT" \
+    --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
   test -s "$CHECKPOINT_PATH"
 
   echo "========== SVD_ENERGY=$SVD_ENERGY: evaluate =========="
@@ -76,7 +80,6 @@ for SVD_ENERGY in "${SVD_ENERGIES[@]}"; do
     --layer "$LAYER" \
     --eval_split "$EVAL_SPLIT" \
     --weight_kappa "$WEIGHT_KAPPA" \
-    --weight_temperature "$WEIGHT_TEMPERATURE" \
     --device "$DEVICE" \
     --dtype "$DTYPE" \
     --seed "$SEED" \

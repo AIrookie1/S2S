@@ -153,8 +153,14 @@ def _build_training_pairs(activations, labels, q_indices, choice_indices, positi
 
 
 
-def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = 4, energy: float = .95, router_hidden: int = 256, epochs: int = 20, batch_size: int = 128, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 1.0, cosine_loss_weight: float = 1.0, router_mask: np.ndarray | None = None, mean_mask: np.ndarray | None = None) -> tuple[dict, list[dict], dict]:
+def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = 4, energy: float = .95, router_hidden: int = 256, epochs: int = 20, batch_size: int = 128, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 1.0, cosine_loss_weight: float = 1.0, router_mask: np.ndarray | None = None, use_zpos_router: bool = True, use_data_mode: int | None = None, aux_interp_count: int = 1, mean_mask: np.ndarray | None = None) -> tuple[dict, list[dict], dict]:
     set_seed(seed)
+    if use_data_mode is None:
+        use_data_mode = 1 if use_zpos_router else 0
+    if use_data_mode not in (0, 1, 2, 3):
+        raise ValueError("use_data_mode must be one of 0, 1, 2, 3")
+    if aux_interp_count < 0:
+        raise ValueError("aux_interp_count must be nonnegative")
     if epochs <= 0 or batch_size <= 0 or learning_rate <= 0 or scale_loss_weight < 0 or cosine_loss_weight < 0:
         raise ValueError("epochs, batch_size, learning_rate, scale_loss_weight, cosine_loss_weight must be valid")
     h_neg_arr = np.asarray(h_neg)
@@ -200,18 +206,46 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
     scale_net = ScaleNet(neg.shape[-1], router_hidden, shared_fc1).to(dev)
     unique_params = {id(p): p for p in list(router.parameters()) + list(scale_net.parameters())}
     opt = torch.optim.Adam(list(unique_params.values()), lr=learning_rate); history = []
-    # Router fitting uses the negative hidden states and their normalized
-    # pair-difference targets. Auxiliary interpolation and mode switches are
-    # intentionally not part of this objective.
+    # Router fitting uses both sides of every validation pair.  The original
+    # z- examples retain their pair-difference target; additional z+ examples
+    # are trained with zero residual/scale targets so they do not produce a
+    # routed intervention when the current state is already z+.
     fit_neg = neg[router_tr]
+    fit_pos = pos[router_tr]
     fit_vec = vectors[router_tr]
-    router_inputs = fit_neg
-    router_dyn_targets = fit_vec
-    router_residual_targets = fit_vec - v_avg
+    n_router = len(fit_neg)
+    sample_inputs = [fit_neg]
+    sample_dyn_targets = [fit_vec]
+    sample_residual_targets = [fit_vec - v_avg]
+    sample_types = [torch.zeros(n_router, dtype=torch.long, device=dev)]  # 0=neg
+    if use_data_mode in (1, 3):
+        sample_inputs.append(fit_pos)
+        sample_dyn_targets.append(torch.zeros_like(fit_pos))
+        sample_residual_targets.append(torch.zeros_like(fit_pos))
+        sample_types.append(torch.ones(n_router, dtype=torch.long, device=dev))  # 1=pos
+    if use_data_mode in (2, 3) and aux_interp_count > 0:
+        beta = torch.rand((n_router, aux_interp_count, 1), device=dev)
+        aux_inputs = (fit_neg[:, None, :] + beta * (fit_pos - fit_neg)[:, None, :]).reshape(-1, fit_neg.shape[-1])
+        aux_dyn_targets = ((1.0 - beta) * fit_vec[:, None, :]).reshape(-1, fit_vec.shape[-1])
+        aux_residual_targets = aux_dyn_targets - v_avg
+        sample_inputs.append(aux_inputs)
+        sample_dyn_targets.append(aux_dyn_targets)
+        sample_residual_targets.append(aux_residual_targets)
+        sample_types.append(torch.full((aux_inputs.shape[0],), 2, dtype=torch.long, device=dev))  # 2=aux
+    router_inputs = torch.cat(sample_inputs, dim=0)
+    router_dyn_targets = torch.cat(sample_dyn_targets, dim=0)
+    router_residual_targets = torch.cat(sample_residual_targets, dim=0)
+    # Fixed direction targets are normalized once and reused across epochs;
+    # magnitudes remain in router_residual_targets for the scale loss.
     router_target_directions = F.normalize(router_dyn_targets, p=2, dim=-1, eps=1e-8)
-    router_sample_type = torch.zeros(len(router_inputs), dtype=torch.long, device=dev)
-    router_is_positive = torch.zeros(len(router_inputs), dtype=torch.bool, device=dev)
-    print(f"Router/ScaleNet samples: total={len(router_inputs)} neg={len(router_inputs)}")
+    router_sample_type = torch.cat(sample_types, dim=0)
+    aux_router_samples = int((router_sample_type == 2).sum().item())
+    router_is_positive = router_sample_type == 1
+    print(
+        f"Router/ScaleNet samples: total={len(router_inputs)} "
+        f"neg={n_router} pos={int(router_is_positive.sum())} "
+        f"aux={aux_router_samples} (per_pair={aux_interp_count})"
+    )
     for epoch in range(1, epochs + 1):
         order = torch.randperm(len(router_inputs), device=dev)
         losses = []
@@ -296,9 +330,15 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         "geometry_train_pairs": int(tr.sum()),
         "router_train_pairs": int(router_tr.sum()),
         "router_optimization_samples": int(len(router_inputs)),
+        # Auxiliary samples are used only by the router/scale optimizer.
+        "aux_router_samples": aux_router_samples,
+        "aux_interp_count": int(aux_interp_count),
+        "use_zpos_router": bool(use_zpos_router),
+        "use_data_mode": int(use_data_mode),
         "train_pairs": int(tr.sum()),
         "scale_loss_weight": scale_loss_weight,
         "cosine_loss_weight": cosine_loss_weight,
+        "use_zpos_router": bool(use_zpos_router),
         "vector_mse": vector_mse,
         "cosine_loss": cosine_loss,
         "scale_mse": scale_mse,

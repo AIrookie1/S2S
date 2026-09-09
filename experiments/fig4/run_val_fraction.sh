@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+
 FIG4_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$FIG4_DIR/../../script/common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/model_config.sh"
 
 GPU=3
 
@@ -13,22 +17,21 @@ NUM_FOLDS=2
 POSITIVE_MODE=mean
 
 # SVD geometry and router training: only VAL_FRACTION changes.
-SVD_ENERGY=0.60
+SVD_RANK=300
 ROUTER_HIDDEN=256
 EPOCHS=2000
 BATCH_SIZE=256
 LEARNING_RATE=0.001
 SCALE_LOSS_WEIGHT=0.03
-COSINE_LOSS_WEIGHT=0.03
+COSINE_LOSS_WEIGHT=0.003
 SEED=42
 DEVICE=cuda
 
 # Same dyn3d evaluation settings as Fig. 3.
-WEIGHT_KAPPA=1e4
-WEIGHT_TEMPERATURE=1.0
+WEIGHT_KAPPA=1e3
 EVAL_SPLIT=test
 DTYPE=float16
-MODEL_DIR="${MODEL_DIR:-/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct}"
+MODEL_DIR="${MODEL_DIR:-$EXP_MODEL_DIR}"
 
 FEATURE_PATH="$FEATURE_DIR/${MODEL}_layer${LAYER}.npz"
 CHECKPOINT_DIR="$FIG4_DIR/checkpoints"
@@ -51,7 +54,7 @@ for VAL_FRACTION in "${VAL_FRACTIONS[@]}"; do
     --num_folds "$NUM_FOLDS" \
     --fold_idx "$FOLD_IDX" \
     --val_fraction "$VAL_FRACTION" \
-    --energy "$SVD_ENERGY" \
+    --rank "$SVD_RANK" \
     --router_hidden "$ROUTER_HIDDEN" \
     --epochs "$EPOCHS" \
     --batch_size "$BATCH_SIZE" \
@@ -60,6 +63,7 @@ for VAL_FRACTION in "${VAL_FRACTIONS[@]}"; do
     --seed "$SEED" \
     --scale_loss_weight "$SCALE_LOSS_WEIGHT" \
     --cosine_loss_weight "$COSINE_LOSS_WEIGHT" \
+    --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
   test -s "$CHECKPOINT_PATH"
 
   echo "========== VAL_FRACTION=$VAL_FRACTION: evaluate =========="
@@ -73,7 +77,6 @@ for VAL_FRACTION in "${VAL_FRACTIONS[@]}"; do
     --layer "$LAYER" \
     --eval_split "$EVAL_SPLIT" \
     --weight_kappa "$WEIGHT_KAPPA" \
-    --weight_temperature "$WEIGHT_TEMPERATURE" \
     --device "$DEVICE" \
     --dtype "$DTYPE" \
     --seed "$SEED" \

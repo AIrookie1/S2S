@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Auxiliary router data: 0 keeps the current negative-only training objective.
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+
 cd "$(dirname "$0")/../.."
+source "$(pwd)/experiments/model_config.sh"
 
 PYTHON=${PYTHON:-/root/miniconda3/envs/py310/bin/python}
 PLOT_PYTHON=${PLOT_PYTHON:-$PYTHON}
-MODEL_DIR=${MODEL_DIR:-/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct}
+MODEL_DIR=${MODEL_DIR:-$EXP_MODEL_DIR}
 GPU=${CUDA_VISIBLE_DEVICES:-0}
 ALPHA=${ALPHA:-1.0}
 FOLDS=${FOLDS:-"0 1"}

@@ -143,7 +143,7 @@ def get_3d_dynamic_intervention(
     router,
     scale_net,
     weight_kappa=5.0,
-    weight_temperature=1.0,
+    
     eps=1e-8,
     small_angle_threshold=1e-4,
     stats=None,
@@ -182,7 +182,7 @@ def get_3d_dynamic_intervention(
             b,
             c,
             kappa=weight_kappa,
-            temperature=weight_temperature,
+            temperature=1.0,
         )
 
         rotated_direction = two_slerp_sym(
@@ -216,7 +216,6 @@ def main():
     parser.add_argument("--layer", type=int, default=14)
     parser.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
     parser.add_argument("--weight_kappa", "--adaptive_kappa", dest="weight_kappa", type=float, default=5.0, help="Similarity attention sharpness for adaptive weights")
-    parser.add_argument("--weight_temperature", "--adaptive_temperature", dest="weight_temperature", type=float, default=0.5, help="Softmax temperature for adaptive weights")
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--preset", default="qa")
     parser.add_argument("--no_instruction", action="store_true")
@@ -235,7 +234,7 @@ def main():
     data, avg, basis, router, scale_net = load_components(args.checkpoint_path, device)
     print(
         f"3d-dyn | dim={basis.shape[1]} rank={basis.shape[0]} "
-        f"adaptive_kappa={args.weight_kappa} temperature={args.weight_temperature}"
+        f"adaptive_kappa={args.weight_kappa}"
     )
     model_path = args.model_dir or HF_NAMES.get(args.model_name, args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -278,7 +277,6 @@ def main():
     hook = None if args.no_intervention else get_3d_dynamic_intervention(
         avg, basis, router, scale_net,
         weight_kappa=args.weight_kappa,
-        weight_temperature=args.weight_temperature,
         eps=args.slerp_eps,
         small_angle_threshold=args.small_angle_threshold,
         stats=stats,
@@ -343,7 +341,6 @@ def main():
         "checkpoint_path": str(args.checkpoint_path),
         "parameters": {
             "weight_kappa": args.weight_kappa,
-            "weight_temperature": args.weight_temperature,
             "few_shot": bool(args.few_shot),
             "preset": args.preset,
         },

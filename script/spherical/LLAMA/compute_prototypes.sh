@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Auxiliary router data: 0 keeps the current negative-only training objective.
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../common.sh"
+source "$SCRIPT_DIR/../../common.sh"
 
 NUM_FOLDS="${NUM_FOLDS:-2}"
 FEATURE_FILE="${FEATURE_FILE:-$FEATURE_DIR/${MODEL}_layer${LAYER}.npz}"

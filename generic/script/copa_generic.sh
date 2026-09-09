@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
@@ -25,7 +28,7 @@ run_dataset() {
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
       SVD_RANK=25; ROUTER_HIDDEN=1024; EPOCHS=400; BATCH_SIZE=256
-      LEARNING_RATE=0.001; VAL_FRACTION=0.2
+      LEARNING_RATE=0.001; VAL_FRACTION=0.5
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.3
       ;;
   esac
@@ -48,13 +51,13 @@ run_dataset() {
     --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" \
     --learning_rate "$LEARNING_RATE" --val_fraction "$VAL_FRACTION" \
     --scale_loss_weight "$SCALE_LOSS_WEIGHT" --cosine_loss_weight "$COSINE_LOSS_WEIGHT" \
-    --device cuda
+    --device cuda \
+    --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
 
   echo "=== $dataset | layer=$layer | evaluate ==="
   CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/evaluate_generic.py \
     --model_name "$MODEL" --model_dir "$MODEL_DIR" \
     --dataset "$dataset" --layer "$layer" --checkpoint_path "$checkpoint" \
-    --weight_kappa "$WEIGHT_KAPPA" --weight_temperature "$WEIGHT_TEMPERATURE" \
   test -s "$mc_result"
   echo "MC result saved: $mc_result"
 }

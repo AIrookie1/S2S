@@ -285,7 +285,6 @@ def main():
     parser.add_argument('--layer', type=int, default=14)
     parser.add_argument('--checkpoint_path', type=str, required=True)
     parser.add_argument('--weight_kappa', type=float, default=5.0)
-    parser.add_argument('--weight_temperature', type=float, default=0.1)
     parser.add_argument('--disable_steering', action='store_true')
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
@@ -329,7 +328,6 @@ def main():
             router,
             scale_net,
             weight_kappa=args.weight_kappa,
-            weight_temperature=args.weight_temperature,
             stats=steering_stats,
         )
 
@@ -384,7 +382,6 @@ def main():
             "steering_enabled": not args.disable_steering,
             "parameters": {
                 "weight_kappa": args.weight_kappa,
-                "weight_temperature": args.weight_temperature,
                 "seed": args.seed,
             },
             "steering_stats": {

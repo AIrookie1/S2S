@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Auxiliary router data: 0 keeps the current negative-only training objective.
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+
 cd "$(dirname "$0")/../.."
+source "$(pwd)/experiments/model_config.sh"
 
 PYTHON=/root/miniconda3/envs/py310/bin/python
-MODEL=llama3.1-8B-Instruct
-MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-CHECKPOINT=features/llama3.1-8B-Instruct_layer14_dynSVD_fold1_mean.npz
+MODEL=$EXP_MODEL
+MODEL_DIR=$EXP_MODEL_DIR
+CHECKPOINT=features/${MODEL}_layer${LAYER}_dynSVD_fold1_mean.npz
 GPU=0
 
 NUM_QUESTIONS=5
-TOP_K=16
-SEED=42
+TOP_K=5
+SEED=3
 OUTPUT_PREFIX=experiments/fig2a/figures/fig2a_topk_positions
 
 export PYTHONDONTWRITEBYTECODE=1

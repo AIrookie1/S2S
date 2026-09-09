@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL=Qwen2.5-7B-Instruct
 MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Qwen2.5-7B-Instruct
@@ -11,11 +14,11 @@ source "$SCRIPT_DIR/../../common.sh"
 FOLD_IDX=1
 NUM_FOLDS=2
 POSITIVE_MODE=mean
-VAL_FRACTION=0.50
+VAL_FRACTION=0.7
 
 # SVD decomposition
-SVD_MODE=energy
-SVD_RANK=32
+SVD_MODE=rank
+SVD_RANK=30
 SVD_ENERGY=0.40
 
 # Router training
@@ -24,7 +27,7 @@ EPOCHS=2000
 BATCH_SIZE=256
 LEARNING_RATE=0.001
 SCALE_LOSS_WEIGHT=0.03
-COSINE_LOSS_WEIGHT=0.03
+COSINE_LOSS_WEIGHT=0.003
 
 # Runtime and paths
 DEVICE=cuda
@@ -45,5 +48,5 @@ ARGS=(--feature_path "$FEATURE_PATH" --positive_mode "$POSITIVE_MODE"
   --cosine_loss_weight "$COSINE_LOSS_WEIGHT")
 
 echo "[train] Similarity-Graph Adaptive 3D router | fold=$FOLD_IDX | svd=$SVD_MODE"
-CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py "${ARGS[@]}"
+CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py "${ARGS[@]}" --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
 test -s "$OUTPUT_PATH"

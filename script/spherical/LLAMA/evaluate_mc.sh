@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/../common.sh"
 
-FOLD_IDX="${FOLD_IDX:-1}"
+# Auxiliary router data: 0 keeps the current negative-only training objective.
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../../common.sh"
+
+FOLD_IDX="${FOLD_IDX:-0}"
 NUM_FOLDS="${NUM_FOLDS:-2}"
 KAPPA="${KAPPA:-20.0}"
 ALPHA="${ALPHA:-0.7}"

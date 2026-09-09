@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+
 FIG3A_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$FIG3A_DIR/../../script/common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/model_config.sh"
 
 GPU=1
 
 # Rank ablation: 10, 20, ..., 100.
-SVD_RANKS=(10 20 30 40 50 60 70 80 90 100)
+SVD_RANKS=(100 200 300 400 500 600 700 800 900 1000)
 FOLD_IDX=0
 NUM_FOLDS=2
 POSITIVE_MODE=mean
 
 # SVD geometry and router training: same settings as Fig. 3.
-VAL_FRACTION=0.50
+VAL_FRACTION=0.5
 ROUTER_HIDDEN=256
 EPOCHS=2000
 BATCH_SIZE=256
@@ -24,11 +28,10 @@ SEED=42
 DEVICE=cuda
 
 # dyn3d evaluation: same settings as Fig. 3.
-WEIGHT_KAPPA=1e2
-WEIGHT_TEMPERATURE=1.0
+WEIGHT_KAPPA=1e3
 EVAL_SPLIT=test
 DTYPE=float16
-MODEL_DIR="${MODEL_DIR:-/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct}"
+MODEL_DIR="${MODEL_DIR:-$EXP_MODEL_DIR}"
 
 FEATURE_PATH="$FEATURE_DIR/${MODEL}_layer${LAYER}.npz"
 CHECKPOINT_DIR="$FIG3A_DIR/checkpoints"
@@ -58,7 +61,8 @@ for SVD_RANK in "${SVD_RANKS[@]}"; do
     --device "$DEVICE" \
     --seed "$SEED" \
     --scale_loss_weight "$SCALE_LOSS_WEIGHT" \
-    --cosine_loss_weight "$COSINE_LOSS_WEIGHT" \
+    --cosine_loss_weight "$COSINE_LOSS_WEIGHT"  \
+    --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
   test -s "$CHECKPOINT_PATH"
 
   echo "========== SVD_RANK=$SVD_RANK: evaluate =========="
@@ -72,12 +76,12 @@ for SVD_RANK in "${SVD_RANKS[@]}"; do
     --layer "$LAYER" \
     --eval_split "$EVAL_SPLIT" \
     --weight_kappa "$WEIGHT_KAPPA" \
-    --weight_temperature "$WEIGHT_TEMPERATURE" \
     --device "$DEVICE" \
     --dtype "$DTYPE" \
     --seed "$SEED" \
     --output_path "$EVAL_JSON" \
     --save_details
+    
   test -s "$EVAL_JSON"
 
   "$PYTHON_BIN" "$FIG3A_DIR/collect_mc1.py" \

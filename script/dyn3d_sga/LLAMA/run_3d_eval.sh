@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Auxiliary router data: 0 keeps the current negative-only training objective.
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL=llama3.1-8B-Instruct
 MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
@@ -8,12 +12,11 @@ LAYER=14
 GPU=0
 source "$SCRIPT_DIR/../../common.sh"
 
-FOLD_IDX=0
+FOLD_IDX=1
 POSITIVE_MODE="${POSITIVE_MODE:-mean}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-float16}"
-WEIGHT_KAPPA="${WEIGHT_KAPPA:-1e2}"
-WEIGHT_TEMPERATURE="${WEIGHT_TEMPERATURE:-1}"
+WEIGHT_KAPPA="${WEIGHT_KAPPA:-1e3}"
 
 # Centrality prior: hidden state / mean direction / residual direction
 
@@ -29,7 +32,6 @@ EVAL_ARGS=(
   --layer "$LAYER"
   --eval_split "${EVAL_SPLIT:-test}"
   --weight_kappa "$WEIGHT_KAPPA"
-  --weight_temperature "$WEIGHT_TEMPERATURE"
   --device "$DEVICE"
   --dtype "$DTYPE"
   --output_path "$OUTPUT_PATH"
