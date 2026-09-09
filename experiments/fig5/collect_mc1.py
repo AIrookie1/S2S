@@ -1,35 +1,94 @@
 #!/usr/bin/env python3
-"""Collect one WEIGHT_KAPPA evaluation into the Fig. 5 summary JSON."""
+"""Collect one WEIGHT_KAPPA result into an independent model/fold summary."""
+
 from __future__ import annotations
-import argparse, json
+
+import argparse
+import json
 from pathlib import Path
+
 import numpy as np
 
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--kappa", type=float, required=True)
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--model-label", required=True)
+    parser.add_argument("--layer", type=int, required=True)
+    parser.add_argument("--fold", type=int, required=True)
+    parser.add_argument("--num-folds", type=int, default=2)
+    parser.add_argument("--eval-json", type=Path, required=True)
+    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    return parser.parse_args()
+
+
 def main() -> None:
-    p = argparse.ArgumentParser()
-    p.add_argument("--kappa", type=float, required=True)
-    p.add_argument("--eval-json", type=Path, required=True)
-    p.add_argument("--checkpoint", type=Path, required=True)
-    p.add_argument("--output", type=Path, required=True)
-    a = p.parse_args()
-    payload = json.loads(a.eval_json.read_text(encoding="utf-8"))
-    mc1 = float(payload["metrics"]["MC1"])
-    with np.load(a.checkpoint, allow_pickle=False) as data:
-        rank = int(np.asarray(data["rank"]).item())
-    summary = json.loads(a.output.read_text(encoding="utf-8")) if a.output.exists() else {
-        "experiment": "fig5_weight_kappa_mc1",
-        "method": "Similarity-Graph Adaptive 3D Spherical Steering",
-        "x_axis": "WEIGHT_KAPPA", "y_axis": "MC1", "results": []}
-    record = {"weight_kappa": a.kappa, "rank": rank, "MC1": mc1,
-              "checkpoint": str(a.checkpoint), "evaluation": str(a.eval_json)}
-    records = [x for x in summary.get("results", []) if float(x["weight_kappa"]) != a.kappa]
+    args = parse_args()
+    evaluation = json.loads(args.eval_json.read_text(encoding="utf-8"))
+    try:
+        mc1 = float(evaluation["metrics"]["MC1"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"Missing numeric metrics.MC1 in {args.eval_json}") from exc
+
+    with np.load(args.checkpoint, allow_pickle=False) as checkpoint:
+        rank = int(np.asarray(checkpoint["rank"]).item())
+        actual_fold = int(np.asarray(checkpoint["fold_idx"]).item())
+
+    if actual_fold != args.fold:
+        raise ValueError(
+            f"Requested fold={args.fold}, checkpoint stores fold={actual_fold}"
+        )
+
+    if args.output.exists():
+        summary = json.loads(args.output.read_text(encoding="utf-8"))
+        if summary.get("model") != args.model or int(summary.get("fold_idx", -1)) != args.fold:
+            raise ValueError(f"Summary metadata mismatch in {args.output}")
+    else:
+        summary = {
+            "experiment": "fig5_weight_kappa_mc1",
+            "method": "Similarity-Graph Adaptive 3D Spherical Steering",
+            "model": args.model,
+            "model_label": args.model_label,
+            "layer": args.layer,
+            "fold_idx": args.fold,
+            "num_folds": args.num_folds,
+            "x_axis": "WEIGHT_KAPPA",
+            "y_axis": "MC1",
+            "results": [],
+        }
+
+    record = {
+        "weight_kappa": args.kappa,
+        "rank": rank,
+        "MC1": mc1,
+        "checkpoint": str(args.checkpoint),
+        "evaluation": str(args.eval_json),
+    }
+    records = [
+        item
+        for item in summary.get("results", [])
+        if float(item["weight_kappa"]) != args.kappa
+    ]
     records.append(record)
-    summary["results"] = sorted(records, key=lambda x: float(x["weight_kappa"]))
-    a.output.parent.mkdir(parents=True, exist_ok=True)
-    tmp = a.output.with_suffix(a.output.suffix + ".tmp")
-    tmp.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(a.output)
-    print(f"WEIGHT_KAPPA={a.kappa:g} | rank={rank} | MC1={mc1:.6f}")
+    summary["results"] = sorted(
+        records, key=lambda item: float(item["weight_kappa"])
+    )
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tmp = args.output.with_suffix(args.output.suffix + ".tmp")
+    tmp.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    tmp.replace(args.output)
+
+    print(
+        f"model={args.model} | fold={args.fold} | "
+        f"WEIGHT_KAPPA={args.kappa:g} | rank={rank} | MC1={mc1:.6f}"
+    )
+
 
 if __name__ == "__main__":
     main()

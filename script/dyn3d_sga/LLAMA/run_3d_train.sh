@@ -7,18 +7,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL=llama3.1-8B-Instruct
 MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
 LAYER=14
-GPU=0
+GPU=2
 source "$SCRIPT_DIR/../../common.sh"
 
 # Fold and data
-FOLD_IDX=1
+FOLD_IDX=0
 NUM_FOLDS=2
 POSITIVE_MODE=mean
 VAL_FRACTION=0.5
 
 # SVD decomposition
 SVD_MODE=rank
-SVD_RANK=40
+SVD_RANK=300
 SVD_ENERGY=0.90
 
 # Router training

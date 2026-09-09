@@ -174,7 +174,7 @@ def get_3d_dynamic_intervention(
         # interpolation. The final-token copy is also the normalized Router
         # input; this is separate from the raw-scale training geometry.
         a = norm(original, eps)
-        coeff = torch.softmax(router.logits(a[:, -1, :]), dim=-1)
+        coeff = router(a[:, -1, :])
         residual = normalize_basis_combination(coeff, basis).float()
         b = mean_direction.view(1, 1, -1).expand_as(a)
         c = residual.view(residual.shape[0], 1, -1).expand_as(a)
@@ -203,6 +203,25 @@ def get_3d_dynamic_intervention(
             stats["beta_sum"] = stats.get("beta_sum", 0.0) + float(beta.sum().item())
             stats["gamma_sum"] = stats.get("gamma_sum", 0.0) + float(gamma.sum().item())
             stats["last_weight_mean"] = weight_info["weights"].mean(dim=tuple(range(weight_info["weights"].ndim - 1))).detach().cpu().tolist()
+            # Optional token-level ternary histogram.  Rows index beta bins
+            # and columns index gamma bins; alpha is implicit as 1-beta-gamma.
+            # Keeping only counts avoids writing millions of raw token triples
+            # while retaining the full density needed by Fig. 7.
+            if "weight_histogram" in stats:
+                bins = int(stats["weight_histogram_bins"])
+                flat = weight_info["weights"].detach().float().reshape(-1, 3)
+                beta_idx = torch.floor(flat[:, 1] * bins).long()
+                gamma_idx = torch.floor(flat[:, 2] * bins).long()
+                valid = (
+                    (beta_idx >= 0)
+                    & (gamma_idx >= 0)
+                    & (beta_idx < bins)
+                    & (gamma_idx < bins)
+                    & (beta_idx + gamma_idx < bins)
+                )
+                linear = beta_idx[valid] * bins + gamma_idx[valid]
+                counts = torch.bincount(linear, minlength=bins * bins)
+                stats["weight_histogram"] += counts.reshape(bins, bins).cpu().numpy()
         return (edited,) + rest if rest is not None else edited
 
     return hook
@@ -228,7 +247,21 @@ def main():
     parser.add_argument("--small_angle_threshold", type=float, default=1e-4)
     parser.add_argument("--output_path", default=None)
     parser.add_argument("--save_details", action="store_true")
+    parser.add_argument(
+        "--weights_output_path",
+        default=None,
+        help="Optional JSON path for token-level alpha/beta/gamma histogram data.",
+    )
+    parser.add_argument(
+        "--weights_bins",
+        type=int,
+        default=80,
+        help="Number of beta/gamma bins per axis for --weights_output_path.",
+    )
     args = parser.parse_args()
+
+    if args.weights_bins < 8:
+        parser.error("--weights_bins must be at least 8")
 
     set_seed(args.seed)
     device = resolve_device(args.device)
@@ -275,6 +308,11 @@ def main():
     Path(args.output_path).parent.mkdir(parents=True, exist_ok=True)
 
     stats = {"total": 0, "steered": 0, "weight_count": 0}
+    if args.weights_output_path:
+        stats["weight_histogram_bins"] = int(args.weights_bins)
+        stats["weight_histogram"] = np.zeros(
+            (args.weights_bins, args.weights_bins), dtype=np.int64
+        )
     hook = None if args.no_intervention else get_3d_dynamic_intervention(
         avg, basis, router, scale_net,
         weight_kappa=args.weight_kappa,
@@ -334,6 +372,32 @@ def main():
             "beta": stats["beta_sum"] / stats["weight_count"],
             "gamma": stats["gamma_sum"] / stats["weight_count"],
         }
+    if args.weights_output_path:
+        weights_path = Path(args.weights_output_path)
+        weights_path.parent.mkdir(parents=True, exist_ok=True)
+        weight_report = {
+            "experiment": "fig7_adaptive_weight_density",
+            "model_name": args.model_name,
+            "layer": int(args.layer),
+            "checkpoint_path": str(args.checkpoint_path),
+            "eval_split": args.eval_split,
+            "weight_kappa": float(args.weight_kappa),
+            "bins": int(args.weights_bins),
+            "coordinates": {"row": "beta", "column": "gamma", "alpha": "1-beta-gamma"},
+            "token_count": int(stats["weight_count"]),
+            "mean_adaptive_weights": {
+                "alpha": stats["alpha_sum"] / max(stats["weight_count"], 1),
+                "beta": stats["beta_sum"] / max(stats["weight_count"], 1),
+                "gamma": stats["gamma_sum"] / max(stats["weight_count"], 1),
+            },
+            "histogram": stats["weight_histogram"].tolist(),
+        }
+        weights_path.write_text(
+            json.dumps(weight_report, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        metrics["weight_histogram_path"] = str(weights_path)
+        metrics["weight_histogram_bins"] = int(args.weights_bins)
     report = {
         "method": "Similarity-Graph Adaptive 3D Spherical Steering",
         "model_name": args.model_name,

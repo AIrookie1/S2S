@@ -1,7 +1,7 @@
 {
   "dataset": "boolq",
   "metric": "MC1",
-  "MC1": 0.8143730886850153,
+  "MC1": 0.8091743119266055,
   "model_name": "llama3.1-8B-Instruct",
   "layer": 12,
   "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_boolq_l12_dyn3d.npz",
@@ -14,9 +14,9 @@
     "steered_tokens": 13080,
     "total_tokens": 13080,
     "mean_adaptive_weights": {
-      "alpha": 0.6741311783597602,
-      "beta": 0.18938983240042348,
-      "gamma": 0.13647898923266047
+      "alpha": 0.8513422079999512,
+      "beta": 0.07263972042178285,
+      "gamma": 0.07601807179703414
     }
   }
 }

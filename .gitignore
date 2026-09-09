@@ -18,4 +18,13 @@ __pycache__
 experiments/**/*.png
 experiments/**/*.pdf
 experiments/**/*.svg
+experiments/**/*.csv
+experiments/**/*.json
+experiments/**/*.log
 
+experiments/*.png
+experiments/*.pdf
+experiments/*.svg
+experiments/*.csv
+experiments/*.json
+experiments/*.log

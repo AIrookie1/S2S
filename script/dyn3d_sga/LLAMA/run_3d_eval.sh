@@ -9,10 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL=llama3.1-8B-Instruct
 MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
 LAYER=14
-GPU=0
+GPU=2
 source "$SCRIPT_DIR/../../common.sh"
 
-FOLD_IDX=0
+FOLD_IDX=1
 POSITIVE_MODE="${POSITIVE_MODE:-mean}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-float16}"

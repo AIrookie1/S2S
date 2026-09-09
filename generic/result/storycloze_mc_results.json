@@ -1,22 +1,22 @@
 {
   "dataset": "storycloze",
   "metric": "MC1",
-  "MC1": 0.8563864990072799,
+  "MC1": 0.7326273990734613,
   "model_name": "llama3.1-8B-Instruct",
   "layer": 27,
   "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_storycloze_l27_dyn3d.npz",
   "steering_enabled": true,
   "parameters": {
-    "weight_kappa": 3.5,
+    "weight_kappa": 2.0,
     "seed": 42
   },
   "steering_stats": {
     "steered_tokens": 29415,
     "total_tokens": 29415,
     "mean_adaptive_weights": {
-      "alpha": 0.6387126785261167,
-      "beta": 0.1473814216835167,
-      "gamma": 0.21390590020209252
+      "alpha": 0.6741259846824297,
+      "beta": 0.14179616367839215,
+      "gamma": 0.18407785264322715
     }
   }
 }

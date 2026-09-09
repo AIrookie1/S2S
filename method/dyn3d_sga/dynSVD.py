@@ -172,7 +172,7 @@ def _build_training_pairs(activations, labels, q_indices, choice_indices, positi
 
 
 
-def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = 4, energy: float = .95, router_hidden: int = 256, epochs: int = 20, batch_size: int = 128, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 1.0, cosine_loss_weight: float = 1.0, router_mask: np.ndarray | None = None, use_zpos_router: bool = True, use_data_mode: int | None = None, aux_interp_count: int = 1, mean_mask: np.ndarray | None = None) -> tuple[dict, list[dict], dict]:
+def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = 4, energy: float = .95, router_hidden: int = 256, epochs: int = 20, batch_size: int = 128, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 1.0, cosine_loss_weight: float = 1.0, router_mask: np.ndarray | None = None, use_zpos_router: bool = True, use_data_mode: int | None = None, aux_interp_count: int = 1, mean_mask: np.ndarray | None = None, vector_loss_weight: float = 1.0) -> tuple[dict, list[dict], dict]:
     set_seed(seed)
     if use_data_mode is None:
         use_data_mode = 1 if use_zpos_router else 0
@@ -180,8 +180,10 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         raise ValueError("use_data_mode must be one of 0, 1, 2, 3")
     if aux_interp_count < 0:
         raise ValueError("aux_interp_count must be nonnegative")
-    if epochs <= 0 or batch_size <= 0 or learning_rate <= 0 or scale_loss_weight < 0 or cosine_loss_weight < 0:
-        raise ValueError("epochs, batch_size, learning_rate, scale_loss_weight, cosine_loss_weight must be valid")
+    if epochs <= 0 or batch_size <= 0 or learning_rate <= 0 or scale_loss_weight < 0 or cosine_loss_weight < 0 or vector_loss_weight < 0:
+        raise ValueError("epochs, batch_size, learning_rate, and loss weights must be valid")
+    if vector_loss_weight == 0 and scale_loss_weight == 0 and cosine_loss_weight == 0:
+        raise ValueError("at least one loss weight must be positive")
     h_neg_arr = np.asarray(h_neg)
     h_pos_arr = np.asarray(h_pos)
     finite_rows = np.isfinite(h_neg_arr).all(axis=1) & np.isfinite(h_pos_arr).all(axis=1)
@@ -289,7 +291,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             cosine_loss_batch = (torch.cat(cosine_terms).mean()
                                  if cosine_terms else torch.zeros((), device=dev))
             loss = (
-                vector_mse_batch
+                vector_loss_weight * vector_mse_batch
                 + scale_loss_weight * scale_mse_batch
                 + cosine_loss_weight * cosine_loss_batch
             )
@@ -374,6 +376,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         "train_pairs": int(tr.sum()),
         "scale_loss_weight": scale_loss_weight,
         "cosine_loss_weight": cosine_loss_weight,
+        "vector_loss_weight": vector_loss_weight,
         "normalization_policy": "raw hidden-state geometry is preserved; Router/ScaleNet hidden-state inputs and routed residual direction are L2-normalized during training",
         "norm_audit": norm_audit,
         "use_zpos_router": bool(use_zpos_router),
@@ -392,6 +395,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         "router_hidden": router_hidden,
         "scale_loss_weight": scale_loss_weight,
         "cosine_loss_weight": cosine_loss_weight,
+        "vector_loss_weight": vector_loss_weight,
         "train_q_indices": np.unique(q_indices[train_mask]),
         "router_q_indices": np.unique(q_indices[np.asarray(router_mask, dtype=bool)]) if router_mask is not None else np.unique(q_indices[train_mask]),
     }

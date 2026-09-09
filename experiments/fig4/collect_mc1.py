@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Add one validation-fraction evaluation result to the Fig. 4 JSON."""
+"""Collect one validation-fraction result into a model/fold summary."""
 
 from __future__ import annotations
 
@@ -13,6 +13,11 @@ import numpy as np
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--val-fraction", type=float, required=True)
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--model-label", required=True)
+    parser.add_argument("--layer", type=int, required=True)
+    parser.add_argument("--fold", type=int, required=True)
+    parser.add_argument("--num-folds", type=int, default=2)
     parser.add_argument("--eval-json", type=Path, required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -29,13 +34,26 @@ def main() -> None:
 
     with np.load(args.checkpoint, allow_pickle=False) as checkpoint:
         rank = int(np.asarray(checkpoint["rank"]).item())
+        actual_fold = int(np.asarray(checkpoint["fold_idx"]).item())
+
+    if actual_fold != args.fold:
+        raise ValueError(
+            f"Requested fold={args.fold}, checkpoint stores fold={actual_fold}"
+        )
 
     if args.output.exists():
         summary = json.loads(args.output.read_text(encoding="utf-8"))
+        if summary.get("model") != args.model or int(summary.get("fold_idx", -1)) != args.fold:
+            raise ValueError(f"Summary metadata mismatch in {args.output}")
     else:
         summary = {
             "experiment": "fig4_val_fraction_mc1",
             "method": "Similarity-Graph Adaptive 3D Spherical Steering",
+            "model": args.model,
+            "model_label": args.model_label,
+            "layer": args.layer,
+            "fold_idx": args.fold,
+            "num_folds": args.num_folds,
             "x_axis": "VAL_FRACTION",
             "y_axis": "MC1",
             "results": [],
@@ -49,7 +67,8 @@ def main() -> None:
         "evaluation": str(args.eval_json),
     }
     records = [
-        item for item in summary.get("results", [])
+        item
+        for item in summary.get("results", [])
         if float(item["val_fraction"]) != args.val_fraction
     ]
     records.append(record)
@@ -58,13 +77,15 @@ def main() -> None:
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = args.output.with_suffix(args.output.suffix + ".tmp")
-    temporary.write_text(
+    tmp = args.output.with_suffix(args.output.suffix + ".tmp")
+    tmp.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    temporary.replace(args.output)
+    tmp.replace(args.output)
+
     print(
+        f"model={args.model} | fold={args.fold} | "
         f"VAL_FRACTION={args.val_fraction:.1f} | rank={rank} | MC1={mc1:.6f}"
     )
 
