@@ -14,8 +14,6 @@ POSITIVE_MODE=mean
 
 # SVD geometry and router training: only VAL_FRACTION changes.
 SVD_ENERGY=0.60
-USE_DATA_MODE=0
-AUX_INTERP_COUNT=8
 ROUTER_HIDDEN=256
 EPOCHS=2000
 BATCH_SIZE=256
@@ -28,10 +26,6 @@ DEVICE=cuda
 # Same dyn3d evaluation settings as Fig. 3.
 WEIGHT_KAPPA=1e4
 WEIGHT_TEMPERATURE=1.0
-HIDDEN_PRIOR=0.33
-MEAN_PRIOR=0.33
-RESIDUAL_PRIOR=0.34
-USE_GATE=0
 EVAL_SPLIT=test
 DTYPE=float16
 MODEL_DIR="${MODEL_DIR:-/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct}"
@@ -66,8 +60,6 @@ for VAL_FRACTION in "${VAL_FRACTIONS[@]}"; do
     --seed "$SEED" \
     --scale_loss_weight "$SCALE_LOSS_WEIGHT" \
     --cosine_loss_weight "$COSINE_LOSS_WEIGHT" \
-    --use_data_mode "$USE_DATA_MODE" \
-    --aux_interp_count "$AUX_INTERP_COUNT"
   test -s "$CHECKPOINT_PATH"
 
   echo "========== VAL_FRACTION=$VAL_FRACTION: evaluate =========="
@@ -82,10 +74,6 @@ for VAL_FRACTION in "${VAL_FRACTIONS[@]}"; do
     --eval_split "$EVAL_SPLIT" \
     --weight_kappa "$WEIGHT_KAPPA" \
     --weight_temperature "$WEIGHT_TEMPERATURE" \
-    --hidden_prior "$HIDDEN_PRIOR" \
-    --mean_prior "$MEAN_PRIOR" \
-    --residual_prior "$RESIDUAL_PRIOR" \
-    --use_gate "$USE_GATE" \
     --device "$DEVICE" \
     --dtype "$DTYPE" \
     --seed "$SEED" \

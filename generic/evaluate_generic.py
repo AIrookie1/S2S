@@ -286,7 +286,6 @@ def main():
     parser.add_argument('--checkpoint_path', type=str, required=True)
     parser.add_argument('--weight_kappa', type=float, default=5.0)
     parser.add_argument('--weight_temperature', type=float, default=0.1)
-    parser.add_argument('--use_gate', type=int, choices=[0, 1], default=1)
     parser.add_argument('--disable_steering', action='store_true')
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
@@ -323,7 +322,6 @@ def main():
     else:
         print(
             f">> Mode: DYN3D (kappa={args.weight_kappa}, "
-            f"temperature={args.weight_temperature}, gate={args.use_gate})"
         )
         hook_fn = get_3d_dynamic_intervention(
             avg,
@@ -332,7 +330,6 @@ def main():
             scale_net,
             weight_kappa=args.weight_kappa,
             weight_temperature=args.weight_temperature,
-            use_gate=bool(args.use_gate),
             stats=steering_stats,
         )
 
@@ -359,7 +356,6 @@ def main():
     if not args.disable_steering:
         print(
             f"Parameters: kappa={args.weight_kappa}, "
-            f"temperature={args.weight_temperature}, gate={args.use_gate}"
         )
         if steering_stats['total'] > 0:
             steer_pct = steering_stats['steered'] / steering_stats['total'] * 100
@@ -389,7 +385,6 @@ def main():
             "parameters": {
                 "weight_kappa": args.weight_kappa,
                 "weight_temperature": args.weight_temperature,
-                "use_gate": bool(args.use_gate),
                 "seed": args.seed,
             },
             "steering_stats": {

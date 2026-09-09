@@ -146,10 +146,6 @@ def main():
     parser.add_argument("--max_new_tokens", type=int, default=50)
     parser.add_argument("--weight_kappa", type=float, default=5.0)
     parser.add_argument("--weight_temperature", type=float, default=0.1)
-    parser.add_argument("--hidden_prior", type=float, default=0.5)
-    parser.add_argument("--mean_prior", type=float, default=0.25)
-    parser.add_argument("--residual_prior", type=float, default=0.25)
-    parser.add_argument("--use_gate", type=int, choices=[0, 1], default=0)
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--disable_steering", action="store_true")
     args = parser.parse_args()
@@ -179,10 +175,6 @@ def main():
             scale_net,
             weight_kappa=args.weight_kappa,
             weight_temperature=args.weight_temperature,
-            hidden_prior=args.hidden_prior,
-            mean_prior=args.mean_prior,
-            residual_prior=args.residual_prior,
-            use_gate=bool(args.use_gate),
         )
 
     print(f"Generating paired answers: {len(test_ids)} questions")
@@ -238,10 +230,6 @@ def main():
         "parameters": {
             "weight_kappa": args.weight_kappa,
             "weight_temperature": args.weight_temperature,
-            "hidden_prior": args.hidden_prior,
-            "mean_prior": args.mean_prior,
-            "residual_prior": args.residual_prior,
-            "use_gate": bool(args.use_gate),
             "steering_enabled": not args.disable_steering,
             "max_new_tokens": args.max_new_tokens,
         },

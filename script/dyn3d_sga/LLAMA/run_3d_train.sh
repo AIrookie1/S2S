@@ -11,8 +11,6 @@ source "$SCRIPT_DIR/../../common.sh"
 FOLD_IDX=0
 NUM_FOLDS=2
 POSITIVE_MODE=mean
-USE_DATA_MODE=0
-AUX_INTERP_COUNT=8
 VAL_FRACTION=0.50
 
 # SVD decomposition
@@ -44,7 +42,6 @@ ARGS=(--feature_path "$FEATURE_PATH" --positive_mode "$POSITIVE_MODE"
   --val_fraction "$VAL_FRACTION" "${SVD_ARGS[@]}" --router_hidden "$ROUTER_HIDDEN"
   --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" --learning_rate "$LEARNING_RATE"
   --device "$DEVICE" --seed "$SEED" --scale_loss_weight "$SCALE_LOSS_WEIGHT"
-  --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
   --cosine_loss_weight "$COSINE_LOSS_WEIGHT")
 
 echo "[train] Similarity-Graph Adaptive 3D router | fold=$FOLD_IDX | svd=$SVD_MODE"
