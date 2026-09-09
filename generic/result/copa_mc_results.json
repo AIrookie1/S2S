@@ -1,22 +1,22 @@
 {
   "dataset": "copa",
   "metric": "MC1",
-  "MC1": 0.67,
+  "MC1": 0.88,
   "model_name": "llama3.1-8B-Instruct",
   "layer": 16,
   "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_copa_l16_dyn3d.npz",
   "steering_enabled": true,
   "parameters": {
-    "weight_kappa": 1000.0,
+    "weight_kappa": 2.0,
     "seed": 42
   },
   "steering_stats": {
     "steered_tokens": 1531,
     "total_tokens": 1531,
     "mean_adaptive_weights": {
-      "alpha": 0.17008097974947275,
-      "beta": 0.3906645278849686,
-      "gamma": 0.43925442962690087
+      "alpha": 0.5257032489870048,
+      "beta": 0.2226298711099008,
+      "gamma": 0.2516668810515837
     }
   }
 }

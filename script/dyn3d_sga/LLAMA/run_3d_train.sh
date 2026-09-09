@@ -18,7 +18,7 @@ VAL_FRACTION=0.5
 
 # SVD decomposition
 SVD_MODE=rank
-SVD_RANK=300
+SVD_RANK=40
 SVD_ENERGY=0.90
 
 # Router training

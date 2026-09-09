@@ -28,7 +28,12 @@ class ResidualRouter(nn.Module):
         return F.softmax(self.logits(z),dim=1)
 
 class ScaleNet(nn.Module):
-    """MLP that predicts the magnitude of the routed residual component."""
+    """MLP that predicts the scalar applied to the routed residual combination.
+
+    The scalar is supervised against the L2 magnitude of the *raw* residual
+    target. Because training deliberately keeps ``coeff @ basis`` unnormalized,
+    the final routed residual magnitude is ``scale * ||coeff @ basis||_2``.
+    """
     def __init__(self, input_dim: int, hidden_dim: int = 256, shared_fc1: nn.Linear | None = None) -> None:
         super().__init__()
         if input_dim <= 0 or hidden_dim <= 0:
@@ -41,15 +46,20 @@ class ScaleNet(nn.Module):
         return F.softplus(self.fc2(F.gelu(self.fc1(z)))).squeeze(-1)
 
 
-def normalize_basis_combination(coeff: torch.Tensor, basis: torch.Tensor) -> torch.Tensor:
-    """Normalize each routed SVD-basis combination to unit L2 norm.
+def raw_basis_combination(coeff: torch.Tensor, basis: torch.Tensor) -> torch.Tensor:
+    """Return the routed SVD-basis combination before direction normalization."""
+    return coeff @ basis
 
-    The SVD rows in ``basis`` are unit vectors, but their routed combination
-    is not generally unit length. This makes ``scale`` represent the
-    residual magnitude independently of the predicted direction. ``eps``
-    keeps the operation finite for a numerically zero combination.
+
+def normalize_basis_combination(coeff: torch.Tensor, basis: torch.Tensor) -> torch.Tensor:
+    """Normalize the routed SVD combination to a unit residual direction.
+
+    This normalization is intentionally retained in Router training:
+    ``routed_direction`` is a direction, while ``scale`` supplies its
+    magnitude.  Hidden-state geometry used to build v_avg/residual/SVD/targets
+    remains on the original, unnormalized scale.
     """
-    return F.normalize(coeff @ basis, p=2, dim=-1, eps=1e-8)
+    return F.normalize(raw_basis_combination(coeff, basis), p=2, dim=-1, eps=1e-8)
 
 
 
@@ -111,11 +121,20 @@ def load_feature_pairs(path: str | Path, positive_mode: str = "mean") -> tuple[n
     # The normalized z_neg/z_pos fields are retained for compatibility with
     # older artifacts, but must not be used for the new raw-vector objective.
     if {"z_neg_raw", "z_pos_raw"}.issubset(keys):
-        h_neg, h_pos = np.asarray(data["z_neg_raw"], np.float32), np.asarray(data["z_pos_raw"], np.float32)
+        h_neg = np.asarray(data["z_neg_raw"], np.float32)
+        h_pos = np.asarray(data["z_pos_raw"], np.float32)
     elif {"z_neg", "z_pos"}.issubset(keys):
-        h_neg, h_pos = np.asarray(data["z_neg"], np.float32), np.asarray(data["z_pos"], np.float32)
+        raise KeyError(
+            "feature file contains only legacy z_neg/z_pos pair fields, which "
+            "may already be L2-normalized. Raw-scale dynSVD training requires "
+            "z_neg_raw/z_pos_raw (or answer-level activations/labels/q_indices). "
+            "Re-run extract_features.py to regenerate raw pair states."
+        )
     else:
-        raise KeyError("feature file must contain answer-level activations or z_neg/z_pos")
+        raise KeyError(
+            "feature file must contain answer-level raw activations or "
+            "z_neg_raw/z_pos_raw"
+        )
     if "vector_q_indices" not in keys:
         raise KeyError("feature file must contain vector_q_indices")
     q = np.asarray(data["vector_q_indices"]).reshape(-1)
@@ -174,12 +193,12 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             "(bfloat16/float32); refusing to start SVD."
         )
     dev = torch.device(device if device != "cuda" or torch.cuda.is_available() else "cpu")
-    # Work on the unit sphere throughout the geometric objective. The
-    # router/ScaleNet inputs are unit hidden states, and each positive-negative
-    # difference is converted to a unit direction before mean/SVD geometry.
-    neg = F.normalize(torch.as_tensor(h_neg, dtype=torch.float32, device=dev), p=2, dim=-1, eps=1e-8)
-    pos = F.normalize(torch.as_tensor(h_pos, dtype=torch.float32, device=dev), p=2, dim=-1, eps=1e-8)
-    vectors = F.normalize(pos - neg, p=2, dim=-1, eps=1e-8)
+    # Preserve the original hidden-state scale for all geometry. In
+    # particular, vectors/residual/SVD and their training targets are defined
+    # from the raw positive and negative representations.
+    neg = torch.as_tensor(h_neg, dtype=torch.float32, device=dev)
+    pos = torch.as_tensor(h_pos, dtype=torch.float32, device=dev)
+    vectors = pos - neg
     # ``train_mask`` is used only for the geometric quantities (mean and SVD
     # residual basis). The optional router mask is the held-out validation
     # question split used to fit the router and ScaleNet.
@@ -188,9 +207,8 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
     router_tr = tr if router_mask is None else torch.as_tensor(router_mask, dtype=torch.bool, device=dev)
     if int(tr.sum()) == 0 or int(mean_tr.sum()) == 0 or int(router_tr.sum()) == 0:
         raise ValueError("geometry, mean, and router masks must all be non-empty")
-    v_avg = F.normalize(vectors[mean_tr].mean(0), p=2, dim=0, eps=1e-8)
-    residual_delta = vectors[tr] - v_avg
-    residual = F.normalize(residual_delta, p=2, dim=-1, eps=1e-8)
+    v_avg = vectors[mean_tr].mean(0)
+    residual = vectors[tr] - v_avg
     # SVD uses the complete selected fold, while v_avg uses only mean_tr
     # (the 80% within-fold subset). Auxiliary samples are excluded from both.
     print(
@@ -232,12 +250,14 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         sample_dyn_targets.append(aux_dyn_targets)
         sample_residual_targets.append(aux_residual_targets)
         sample_types.append(torch.full((aux_inputs.shape[0],), 2, dtype=torch.long, device=dev))  # 2=aux
-    router_inputs = torch.cat(sample_inputs, dim=0)
+    # Normalize only the hidden-state copies consumed by Router/ScaleNet.
+    # Targets, residual magnitudes, and all geometric quantities above remain
+    # on the raw hidden-state scale. This also covers synthetic interpolation
+    # samples after they are constructed from raw states.
+    raw_router_inputs = torch.cat(sample_inputs, dim=0)
+    router_inputs = F.normalize(raw_router_inputs, p=2, dim=-1, eps=1e-8)
     router_dyn_targets = torch.cat(sample_dyn_targets, dim=0)
     router_residual_targets = torch.cat(sample_residual_targets, dim=0)
-    # Fixed direction targets are normalized once and reused across epochs;
-    # magnitudes remain in router_residual_targets for the scale loss.
-    router_target_directions = F.normalize(router_dyn_targets, p=2, dim=-1, eps=1e-8)
     router_sample_type = torch.cat(sample_types, dim=0)
     aux_router_samples = int((router_sample_type == 2).sum().item())
     router_is_positive = router_sample_type == 1
@@ -255,10 +275,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             scale = scale_net(router_inputs[idx])
             routed_direction = normalize_basis_combination(coeff, basis)
             dyn = v_avg + scale[:, None] * routed_direction
-            # Compare unit directions, matching the inference geometry.
-            dyn_direction = F.normalize(dyn, p=2, dim=-1, eps=1e-8)
-            target_direction = router_target_directions[idx]
-            vector_mse_batch = F.mse_loss(dyn_direction, target_direction)
+            vector_mse_batch = F.mse_loss(dyn, router_dyn_targets[idx])
             # print(torch.linalg.vector_norm(router_residual_targets[idx], dim=-1))
             scale_mse_batch = F.mse_loss(scale, torch.linalg.vector_norm(router_residual_targets[idx], dim=-1))
             # Preserve cosine loss for z- inputs. z+ has a zero direction
@@ -267,7 +284,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             cosine_terms = []
             if (~is_pos).any():
                 cosine_terms.append(1.0 - F.cosine_similarity(
-                    dyn_direction[~is_pos], target_direction[~is_pos], dim=-1
+                    dyn[~is_pos], router_dyn_targets[idx][~is_pos], dim=-1
                 ))
             cosine_loss_batch = (torch.cat(cosine_terms).mean()
                                  if cosine_terms else torch.zeros((), device=dev))
@@ -286,11 +303,9 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             scale = scale_net(router_inputs)
             routed_direction = normalize_basis_combination(coeff, basis)
             dyn = v_avg + scale[:, None] * routed_direction
-            dyn_direction = F.normalize(dyn, p=2, dim=-1, eps=1e-8)
-            target_direction = router_target_directions
-            vector_mse = float(F.mse_loss(dyn_direction, target_direction).cpu())
+            vector_mse = float(F.mse_loss(dyn, router_dyn_targets).cpu())
             cosine_mask = ~router_is_positive
-            cosine_loss = float((1.0 - F.cosine_similarity(dyn_direction[cosine_mask], target_direction[cosine_mask], dim=-1)).mean().cpu())
+            cosine_loss = float((1.0 - F.cosine_similarity(dyn[cosine_mask], router_dyn_targets[cosine_mask], dim=-1)).mean().cpu())
             residual_mag = float(
                 torch.linalg.vector_norm(
                     scale[:, None] * routed_direction, dim=-1
@@ -300,6 +315,9 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
                 F.mse_loss(scale, torch.linalg.vector_norm(router_residual_targets, dim=-1)).cpu()
             )
             scale_mean = float(scale.mean().cpu())
+            routed_combination_norm = float(
+                torch.linalg.vector_norm(routed_direction, dim=-1).mean().cpu()
+            )
 
         rec = {
             "epoch": epoch,
@@ -309,6 +327,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             "residual_magnitude": residual_mag,
             "scale_mse": scale_mse,
             "scale_mean": scale_mean,
+            "routed_combination_norm": routed_combination_norm,
         }
         history.append(rec)
         print(
@@ -320,6 +339,24 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
     explained = float(
         sv_power[:r].sum().cpu() / (sv_power.sum().cpu() + 1e-12)
     )
+    with torch.no_grad():
+        raw_router_input_norms = torch.linalg.vector_norm(raw_router_inputs, dim=-1)
+        normalized_router_input_norms = torch.linalg.vector_norm(router_inputs, dim=-1)
+        basis_row_norms = torch.linalg.vector_norm(basis, dim=-1)
+        target_residual_norms = torch.linalg.vector_norm(router_residual_targets, dim=-1)
+        norm_audit = {
+            "raw_router_input_norm_mean": float(raw_router_input_norms.mean().cpu()),
+            "router_input_after_normalize_norm_mean": float(normalized_router_input_norms.mean().cpu()),
+            "v_avg_norm": float(torch.linalg.vector_norm(v_avg).cpu()),
+            "svd_residual_norm_mean": float(torch.linalg.vector_norm(residual, dim=-1).mean().cpu()),
+            "target_residual_norm_mean": float(target_residual_norms.mean().cpu()),
+            "basis_row_norm_mean": float(basis_row_norms.mean().cpu()),
+            "basis_row_norm_min": float(basis_row_norms.min().cpu()),
+            "basis_row_norm_max": float(basis_row_norms.max().cpu()),
+            "routed_combination_norm_mean": routed_combination_norm,
+            "scaled_routed_residual_norm_mean": residual_mag,
+        }
+
     metrics = {
         "rank": r,
         "singular_values": singular.detach().cpu().numpy(),
@@ -333,11 +370,12 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         # Auxiliary samples are used only by the router/scale optimizer.
         "aux_router_samples": aux_router_samples,
         "aux_interp_count": int(aux_interp_count),
-        "use_zpos_router": bool(use_zpos_router),
         "use_data_mode": int(use_data_mode),
         "train_pairs": int(tr.sum()),
         "scale_loss_weight": scale_loss_weight,
         "cosine_loss_weight": cosine_loss_weight,
+        "normalization_policy": "raw hidden-state geometry is preserved; Router/ScaleNet hidden-state inputs and routed residual direction are L2-normalized during training",
+        "norm_audit": norm_audit,
         "use_zpos_router": bool(use_zpos_router),
         "vector_mse": vector_mse,
         "cosine_loss": cosine_loss,

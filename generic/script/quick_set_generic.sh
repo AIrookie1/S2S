@@ -24,28 +24,46 @@ run_dataset() {
   # Add or adjust a dataset block without affecting the others.
   local SVD_RANK ROUTER_HIDDEN EPOCHS BATCH_SIZE LEARNING_RATE VAL_FRACTION POSITIVE_MODE WEIGHT_KAPPA
   POSITIVE_MODE=mean
-  WEIGHT_KAPPA=1e3
   case "$dataset" in
     boolq)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=25; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
-      LEARNING_RATE=0.001; VAL_FRACTION=0.5
+      SVD_RANK=50; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      LEARNING_RATE=0.001; VAL_FRACTION=0.8
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.003
+      WEIGHT_KAPPA=3.5
       ;;
     copa)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=25; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
-      LEARNING_RATE=0.001; VAL_FRACTION=0.5
+      SVD_RANK=60; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      LEARNING_RATE=0.001; VAL_FRACTION=0.9
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.003
+      WEIGHT_KAPPA=1.0
       ;;
-    storycloze|mmlu_global|winogrande)
+    storycloze)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=25; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
-      LEARNING_RATE=0.001; VAL_FRACTION=0.5
+      SVD_RANK=70; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      LEARNING_RATE=0.001; VAL_FRACTION=0.6
       SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.003
+      WEIGHT_KAPPA=2
+      ;;
+    mmlu_global)
+      MODEL=llama3.1-8B-Instruct
+      MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
+      SVD_RANK=40; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      LEARNING_RATE=0.001; VAL_FRACTION=0.2
+      SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.003
+      WEIGHT_KAPPA=4
+      ;;
+    winogrande)
+      MODEL=llama3.1-8B-Instruct
+      MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
+      SVD_RANK=40; ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256
+      LEARNING_RATE=0.001; VAL_FRACTION=0.4
+      SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.003
+      WEIGHT_KAPPA=3
       ;;
     *) echo "Unknown dataset: $dataset" >&2; return 2 ;;
   esac
@@ -56,9 +74,9 @@ run_dataset() {
 
   echo "=== $dataset | layer=$layer | extract ==="
   # Uncomment to regenerate activations when the feature file is missing or outdated.
-  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/get_activations_generic.py \
-    --model_name "$MODEL" --model_dir "$MODEL_DIR" \
-    --dataset "$dataset" --split train --layer "$layer" --save_dir "$FEATURE_DIR"
+  # CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/get_activations_generic.py \
+  #   --model_name "$MODEL" --model_dir "$MODEL_DIR" \
+  #   --dataset "$dataset" --split train --layer "$layer" --save_dir "$FEATURE_DIR"
 
   echo "=== $dataset | layer=$layer | train Dyn3D ==="
   CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py \
@@ -84,4 +102,4 @@ run_dataset boolq 12
 run_dataset copa 16
 run_dataset storycloze 27
 # run_dataset mmlu_global 28
-run_dataset winogrande 16
+# run_dataset winogrande 16

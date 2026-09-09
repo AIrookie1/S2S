@@ -10,7 +10,7 @@ MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
 LAYER=${LAYER:-14}; GPU=${GPU:-0}; FOLD_IDX=${FOLD_IDX:-0}
 source "$SCRIPT_DIR/../../common.sh"
 export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
-WEIGHT_KAPPA=1e3
+WEIGHT_KAPPA=10
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}_dynSVD_fold${FOLD_IDX}_mean.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-$JUDGE_DIR/llama_truthfulqa}"
 OUTPUT_PATH="${OUTPUT_PATH:-$OUTPUT_DIR/${MODEL}_l${LAYER}_fold${FOLD_IDX}_llm_judge_3d.json}"

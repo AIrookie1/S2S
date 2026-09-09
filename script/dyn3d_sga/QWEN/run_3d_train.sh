@@ -11,7 +11,7 @@ GPU=2
 source "$SCRIPT_DIR/../../common.sh"
 
 # Fold and data
-FOLD_IDX=1
+FOLD_IDX=0
 NUM_FOLDS=2
 POSITIVE_MODE=mean
 VAL_FRACTION=0.7

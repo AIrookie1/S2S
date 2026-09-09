@@ -2,7 +2,7 @@
 set -euo pipefail
 
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
-AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-4}"
 
 FIG3A_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$FIG3A_DIR/../../script/common.sh"
@@ -11,7 +11,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/model_config.sh"
 GPU=1
 
 # Rank ablation: 10, 20, ..., 100.
-SVD_RANKS=(100 200 300 400 500 600 700 800 900 1000)
+SVD_RANKS=(10 20 30 40 50 60 70 80 90 100)
 FOLD_IDX=0
 NUM_FOLDS=2
 POSITIVE_MODE=mean
@@ -28,7 +28,7 @@ SEED=42
 DEVICE=cuda
 
 # dyn3d evaluation: same settings as Fig. 3.
-WEIGHT_KAPPA=1e3
+WEIGHT_KAPPA=10
 EVAL_SPLIT=test
 DTYPE=float16
 MODEL_DIR="${MODEL_DIR:-$EXP_MODEL_DIR}"

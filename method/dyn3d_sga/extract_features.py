@@ -106,9 +106,9 @@ def main() -> None:
         positive_choice_indices, negative_choice_indices, vector_question_offsets,
         z_pos, z_neg, v_t, v_h, positive_counts, negative_counts, pair_counts,
     ) = build_question_vectors(activations, data["labels"], data["q_indices"], data["choice_indices"])
-    # dynSVD is trained on equal-length unit representations. Keep raw pair
-    # states for traceability, while exposing normalized z_neg/z_pos as the
-    # canonical fields consumed by the trainer.
+    # Keep both raw and normalized pair states for compatibility. The current
+    # trainer uses the raw fields for geometry/residual/SVD and normalizes only
+    # the copies sent into Router/ScaleNet.
     z_neg_raw, z_pos_raw = z_neg, z_pos
     z_neg = z_neg_raw / np.maximum(np.linalg.norm(z_neg_raw, axis=1, keepdims=True), 1e-12)
     z_pos = z_pos_raw / np.maximum(np.linalg.norm(z_pos_raw, axis=1, keepdims=True), 1e-12)

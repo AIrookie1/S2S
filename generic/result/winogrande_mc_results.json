@@ -1,22 +1,22 @@
 {
   "dataset": "winogrande",
   "metric": "MC1",
-  "MC1": 0.5177584846093133,
+  "MC1": 0.5351223362273086,
   "model_name": "llama3.1-8B-Instruct",
   "layer": 16,
   "checkpoint_path": "./checkpoints_generic/llama3.1-8B-Instruct_winogrande_l16_dyn3d.npz",
   "steering_enabled": true,
   "parameters": {
-    "weight_kappa": 1000.0,
+    "weight_kappa": 3.0,
     "seed": 42
   },
   "steering_stats": {
     "steered_tokens": 5311,
     "total_tokens": 5311,
     "mean_adaptive_weights": {
-      "alpha": 0.6298121569116694,
-      "beta": 0.2653008517522503,
-      "gamma": 0.10488692163366133
+      "alpha": 0.5097807202452411,
+      "beta": 0.36831063728529145,
+      "gamma": 0.12190864184098692
     }
   }
 }

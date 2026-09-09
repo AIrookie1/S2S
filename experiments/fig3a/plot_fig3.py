@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Plot Fig. 3a: MC1 as a function of the dyn3d SVD rank."""
-
 from __future__ import annotations
 
 import argparse

@@ -28,7 +28,7 @@ SEED=42
 DEVICE=cuda
 
 # Same dyn3d evaluation settings as Fig. 3.
-WEIGHT_KAPPA=1e3
+WEIGHT_KAPPA=10
 EVAL_SPLIT=test
 DTYPE=float16
 MODEL_DIR="${MODEL_DIR:-$EXP_MODEL_DIR}"

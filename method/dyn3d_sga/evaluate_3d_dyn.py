@@ -60,6 +60,7 @@ def adaptive_3way_weights(
     s_xr = (x * r).sum(dim=-1, keepdim=True)
     s_vr = (v * r).sum(dim=-1, keepdim=True)
 
+    temperature = kappa
     attn_x = torch.softmax(kappa * torch.cat([s_xv, s_xr], dim=-1), dim=-1)
     a_xv, a_xr = attn_x[..., 0:1], attn_x[..., 1:2]
     attn_v = torch.softmax(kappa * torch.cat([s_xv, s_vr], dim=-1), dim=-1)
@@ -79,7 +80,7 @@ def adaptive_3way_weights(
         ],
         dim=-1,
     )
-    weights = torch.softmax(centrality / temperature, dim=-1)
+    weights = torch.softmax(centrality * temperature, dim=-1)
     return (
         weights[..., 0:1],
         weights[..., 1:2],
@@ -169,9 +170,9 @@ def get_3d_dynamic_intervention(
         )
         original = hidden[:, start:, :].float()
         original_norm = torch.linalg.vector_norm(original, dim=-1, keepdim=True).clamp_min(eps)
-        # Normalize the active hidden sequence once. Reuse its final token as
-        # the router input so router and spherical geometry see the same unit
-        # representation as training.
+        # 3D inference intentionally works on unit directions for its spherical
+        # interpolation. The final-token copy is also the normalized Router
+        # input; this is separate from the raw-scale training geometry.
         a = norm(original, eps)
         coeff = torch.softmax(router.logits(a[:, -1, :]), dim=-1)
         residual = normalize_basis_combination(coeff, basis).float()

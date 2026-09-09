@@ -12,11 +12,11 @@ LAYER=14
 GPU=0
 source "$SCRIPT_DIR/../../common.sh"
 
-FOLD_IDX=1
+FOLD_IDX=0
 POSITIVE_MODE="${POSITIVE_MODE:-mean}"
 DEVICE="${DEVICE:-cuda}"
 DTYPE="${DTYPE:-float16}"
-WEIGHT_KAPPA="${WEIGHT_KAPPA:-1e3}"
+WEIGHT_KAPPA="${WEIGHT_KAPPA:-10}"
 
 # Centrality prior: hidden state / mean direction / residual direction
 

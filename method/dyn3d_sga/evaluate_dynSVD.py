@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -97,9 +98,10 @@ def get_dynamic_intervention(
             ),
         )
 
-        # Use the pre-intervention hidden state at its original scale. This
-        # must match the raw z- representations used to train the router.
-        z = hidden[:, start, :].float()
+        # Normalize only the hidden-state copy consumed by Router. The
+        # intervention itself (dynamic mean, residual, and candidate) stays on
+        # the original hidden-state scale used by training geometry.
+        z = F.normalize(hidden[:, start, :].float(), p=2, dim=-1, eps=1e-8)
         logits = router.logits(z)
         coeff = torch.softmax(logits, dim=-1)
         # The eval-time residual is direction-only. The training-time
