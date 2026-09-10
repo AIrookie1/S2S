@@ -11,14 +11,14 @@ MODEL=llama3.1-8B-Instruct
 MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
 
 LAYER=${LAYER:-14}
-GPU=${GPU:-3}
-FOLD_IDX=${FOLD_IDX:-1}
+GPU=${GPU:-0}
+FOLD_IDX=${FOLD_IDX:-0}
 
 source "$SCRIPT_DIR/../../common.sh"
 export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 
-WEIGHT_KAPPA=${WEIGHT_KAPPA:-10}
-MARGIN=${MARGIN:--0}
+WEIGHT_KAPPA=${WEIGHT_KAPPA:-5}
+MARGIN=${MARGIN:--0.3}
 PRESET=${PRESET:-null}
 
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}_dynSVD_fold${FOLD_IDX}_mean.npz}"
@@ -41,7 +41,7 @@ INFO_JUDGE_PATH="${INFO_JUDGE_PATH:-/mnt/nas-public-bing/pinxuanli11/truthfulqa-
 #   REBUILD_CACHE=1  -> discard/rebuild Pass-1/2 cache
 #   CACHE_ONLY=1     -> only build/reuse Pass-1/2 cache; do not run Pass 3/judges
 #   EXTRA_ARGS="..." -> any additional Python arguments, e.g. --max_samples 20
-REBUILD_CACHE="${REBUILD_CACHE:-0}"
+REBUILD_CACHE="${REBUILD_CACHE:-1}"
 CACHE_ONLY="${CACHE_ONLY:-0}"
 
 mkdir -p "$OUTPUT_DIR"

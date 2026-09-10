@@ -11,21 +11,83 @@ from torch import nn
 
 
 class ResidualRouter(nn.Module):
-    def __init__(self, input_dim: int, rank: int, hidden_dim: int = 256, shared_fc1: nn.Linear | None = None) -> None:
+    def __init__(
+        self,
+        input_dim: int,
+        rank: int,
+        hidden_dim: int = 256,
+        shared_fc1: nn.Linear | None = None,
+        top_k: int | None = None,
+    ) -> None:
         super().__init__()
-        if rank <= 0 or hidden_dim <= 0: raise ValueError("rank and hidden_dim must be positive")
+        if rank <= 0 or hidden_dim <= 0:
+            raise ValueError("rank and hidden_dim must be positive")
+        if top_k is not None and top_k <= 0:
+            raise ValueError("top_k must be positive")
         self.fc1 = shared_fc1 if shared_fc1 is not None else nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, rank)
         self.input_dim, self.rank, self.hidden_dim = input_dim, rank, hidden_dim
+        # ``None`` preserves the legacy dense router. New training passes an
+        # explicit Top-K value and stores it in the checkpoint.
+        self.top_k = rank if top_k is None else min(int(top_k), rank)
 
     def logits(self, z: torch.Tensor) -> torch.Tensor:
         return self.fc2(F.gelu(self.fc1(z)))
 
+    def route_logits(self, logits: torch.Tensor) -> torch.Tensor:
+        """Apply sparse Top-K routing and renormalize selected coefficients."""
+        if logits.shape[-1] != self.rank:
+            raise ValueError(
+                f"router logits last dim must be rank={self.rank}, got {logits.shape[-1]}"
+            )
+        if self.top_k >= self.rank:
+            return F.softmax(logits, dim=-1)
+        topk_idx = torch.topk(logits, k=self.top_k, dim=-1).indices
+        selected = torch.zeros_like(logits, dtype=torch.bool).scatter_(-1, topk_idx, True)
+        sparse_logits = logits.masked_fill(~selected, float("-inf"))
+        return F.softmax(sparse_logits, dim=-1)
+
     def forward(self, z: torch.Tensor) -> torch.Tensor:
-        # The router represents a convex combination of the SVD basis
-        # vectors. Keep this path identical to evaluation (which exposes
-        # Expose logits through ``logits`` for callers that need them.
-        return F.softmax(self.logits(z),dim=1)
+        # Training and evaluation intentionally share exactly the same sparse
+        # routing path so a Top-K checkpoint never falls back to dense softmax.
+        return self.route_logits(self.logits(z))
+
+
+def router_load_balancing_loss(logits: torch.Tensor, top_k: int) -> torch.Tensor:
+    """Switch-style auxiliary loss for balancing Top-K basis utilization.
+
+    ``importance`` is the mean dense router probability and ``load`` is the
+    normalized fraction of Top-K assignments received by each basis. The hard
+    load is treated as a routing statistic while gradients flow through the
+    dense probabilities, including currently unselected bases. A perfectly
+    balanced assignment has loss near 1; collapse increases the loss.
+    """
+    if logits.ndim != 2:
+        raise ValueError("load-balancing loss expects [batch, num_bases] logits")
+    num_bases = logits.shape[-1]
+    if num_bases <= 0 or top_k <= 0:
+        raise ValueError("num_bases and top_k must be positive")
+    k = min(int(top_k), num_bases)
+    if k >= num_bases:
+        # Every basis is selected, so dispatch load is already perfectly even.
+        return logits.new_zeros(())
+    dense_prob = F.softmax(logits, dim=-1)
+    topk_idx = torch.topk(logits, k=k, dim=-1).indices
+    assignments = torch.zeros_like(dense_prob).scatter_(-1, topk_idx, 1.0)
+    load = (assignments.mean(dim=0) / float(k)).detach()
+    importance = dense_prob.mean(dim=0)
+    return num_bases * torch.sum(load * importance)
+
+
+def router_expert_load_fraction(logits: torch.Tensor, top_k: int) -> torch.Tensor:
+    """Return normalized Top-K assignment frequency for each routed basis."""
+    if logits.ndim != 2:
+        raise ValueError("expert load expects [batch, num_bases] logits")
+    num_bases = logits.shape[-1]
+    k = min(int(top_k), num_bases)
+    topk_idx = torch.topk(logits, k=k, dim=-1).indices
+    assignments = torch.zeros_like(logits).scatter_(-1, topk_idx, 1.0)
+    return assignments.mean(dim=0) / float(k)
 
 class ScaleNet(nn.Module):
     """MLP that predicts the scalar applied to the routed residual combination.
@@ -172,7 +234,7 @@ def _build_training_pairs(activations, labels, q_indices, choice_indices, positi
 
 
 
-def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = 4, energy: float = .95, router_hidden: int = 256, epochs: int = 20, batch_size: int = 128, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 1.0, cosine_loss_weight: float = 1.0, router_mask: np.ndarray | None = None, use_zpos_router: bool = True, use_data_mode: int | None = None, aux_interp_count: int = 1, mean_mask: np.ndarray | None = None, vector_loss_weight: float = 1.0) -> tuple[dict, list[dict], dict]:
+def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = 4, energy: float = .95, router_hidden: int = 256, epochs: int = 20, batch_size: int = 128, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 1.0, cosine_loss_weight: float = 1.0, router_mask: np.ndarray | None = None, use_zpos_router: bool = True, use_data_mode: int | None = None, aux_interp_count: int = 1, mean_mask: np.ndarray | None = None, vector_loss_weight: float = 1.0, router_top_k: int = 4, load_balance_loss_weight: float = 0.01) -> tuple[dict, list[dict], dict]:
     set_seed(seed)
     if use_data_mode is None:
         use_data_mode = 1 if use_zpos_router else 0
@@ -180,9 +242,11 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         raise ValueError("use_data_mode must be one of 0, 1, 2, 3")
     if aux_interp_count < 0:
         raise ValueError("aux_interp_count must be nonnegative")
-    if epochs <= 0 or batch_size <= 0 or learning_rate <= 0 or scale_loss_weight < 0 or cosine_loss_weight < 0 or vector_loss_weight < 0:
+    if router_top_k <= 0:
+        raise ValueError("router_top_k must be positive")
+    if epochs <= 0 or batch_size <= 0 or learning_rate <= 0 or scale_loss_weight < 0 or cosine_loss_weight < 0 or vector_loss_weight < 0 or load_balance_loss_weight < 0:
         raise ValueError("epochs, batch_size, learning_rate, and loss weights must be valid")
-    if vector_loss_weight == 0 and scale_loss_weight == 0 and cosine_loss_weight == 0:
+    if vector_loss_weight == 0 and scale_loss_weight == 0 and cosine_loss_weight == 0 and load_balance_loss_weight == 0:
         raise ValueError("at least one loss weight must be positive")
     h_neg_arr = np.asarray(h_neg)
     h_pos_arr = np.asarray(h_pos)
@@ -221,8 +285,17 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
     print("SVD complete", flush=True)
     r = choose_rank(singular, rank, energy); basis = vh[:r].contiguous()
     print(f"r的大小{r}")
+    effective_router_top_k = min(int(router_top_k), r)
+    if effective_router_top_k != router_top_k:
+        print(
+            f"router_top_k={router_top_k} exceeds rank={r}; "
+            f"using top_k={effective_router_top_k}",
+            flush=True,
+        )
     shared_fc1 = nn.Linear(neg.shape[-1], router_hidden).to(dev)
-    router = ResidualRouter(neg.shape[-1], r, router_hidden, shared_fc1).to(dev)
+    router = ResidualRouter(
+        neg.shape[-1], r, router_hidden, shared_fc1, top_k=effective_router_top_k
+    ).to(dev)
     scale_net = ScaleNet(neg.shape[-1], router_hidden, shared_fc1).to(dev)
     unique_params = {id(p): p for p in list(router.parameters()) + list(scale_net.parameters())}
     opt = torch.optim.Adam(list(unique_params.values()), lr=learning_rate); history = []
@@ -273,7 +346,8 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         losses = []
         for start in range(0, len(router_inputs), batch_size):
             idx = order[start:start + batch_size]
-            coeff = router(router_inputs[idx])
+            router_logits = router.logits(router_inputs[idx])
+            coeff = router.route_logits(router_logits)
             scale = scale_net(router_inputs[idx])
             routed_direction = normalize_basis_combination(coeff, basis)
             dyn = v_avg + scale[:, None] * routed_direction
@@ -290,10 +364,14 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
                 ))
             cosine_loss_batch = (torch.cat(cosine_terms).mean()
                                  if cosine_terms else torch.zeros((), device=dev))
+            load_balance_loss_batch = router_load_balancing_loss(
+                router_logits, router.top_k
+            )
             loss = (
                 vector_loss_weight * vector_mse_batch
                 + scale_loss_weight * scale_mse_batch
                 + cosine_loss_weight * cosine_loss_batch
+                + load_balance_loss_weight * load_balance_loss_batch
             )
             opt.zero_grad(set_to_none=True)
             loss.backward()
@@ -301,7 +379,8 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             losses.append(float(loss.detach().cpu()))
 
         with torch.no_grad():
-            coeff = router(router_inputs)
+            router_logits = router.logits(router_inputs)
+            coeff = router.route_logits(router_logits)
             scale = scale_net(router_inputs)
             routed_direction = normalize_basis_combination(coeff, basis)
             dyn = v_avg + scale[:, None] * routed_direction
@@ -320,6 +399,12 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             routed_combination_norm = float(
                 torch.linalg.vector_norm(routed_direction, dim=-1).mean().cpu()
             )
+            load_balance_loss = float(
+                router_load_balancing_loss(router_logits, router.top_k).cpu()
+            )
+            expert_load_fraction = router_expert_load_fraction(
+                router_logits, router.top_k
+            ).cpu().tolist()
 
         rec = {
             "epoch": epoch,
@@ -330,11 +415,12 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
             "scale_mse": scale_mse,
             "scale_mean": scale_mean,
             "routed_combination_norm": routed_combination_norm,
+            "load_balance_loss": load_balance_loss,
         }
         history.append(rec)
         print(
-            "epoch %03d | loss=%.6e vector_mse=%.6e scale_mse=%.6e cosine_loss=%.6e"
-            % (epoch, rec["loss"], vector_mse, scale_mse, cosine_loss)
+            "epoch %03d | loss=%.6e vector_mse=%.6e scale_mse=%.6e cosine_loss=%.6e load_balance=%.6e"
+            % (epoch, rec["loss"], vector_mse, scale_mse, cosine_loss, load_balance_loss)
         )
 
     sv_power = singular.square()
@@ -377,6 +463,10 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         "scale_loss_weight": scale_loss_weight,
         "cosine_loss_weight": cosine_loss_weight,
         "vector_loss_weight": vector_loss_weight,
+        "load_balance_loss_weight": load_balance_loss_weight,
+        "router_top_k": int(router.top_k),
+        "load_balance_loss": load_balance_loss,
+        "expert_load_fraction": expert_load_fraction,
         "normalization_policy": "raw hidden-state geometry is preserved; Router/ScaleNet hidden-state inputs and routed residual direction are L2-normalized during training",
         "norm_audit": norm_audit,
         "use_zpos_router": bool(use_zpos_router),
@@ -396,6 +486,8 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
         "scale_loss_weight": scale_loss_weight,
         "cosine_loss_weight": cosine_loss_weight,
         "vector_loss_weight": vector_loss_weight,
+        "load_balance_loss_weight": load_balance_loss_weight,
+        "router_top_k": int(router.top_k),
         "train_q_indices": np.unique(q_indices[train_mask]),
         "router_q_indices": np.unique(q_indices[np.asarray(router_mask, dtype=bool)]) if router_mask is not None else np.unique(q_indices[train_mask]),
     }

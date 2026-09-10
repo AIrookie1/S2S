@@ -31,7 +31,7 @@ EVAL_FOLD=1
 #
 # means every question contributes exactly 30 router indices.
 # ============================================================
-TOPK="${TOPK:-10}"
+TOPK="${TOPK:-1}"
 
 
 # ============================================================

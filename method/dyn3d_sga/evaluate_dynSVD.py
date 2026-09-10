@@ -40,6 +40,8 @@ def load_components(path: str, device: torch.device):
     dim = int(data["hidden_dim"].item())
     rank = int(data["rank"].item())
     router_hidden = int(data["router_hidden"].item())
+    # Old checkpoints did not store router_top_k and used dense softmax.
+    router_top_k = int(data["router_top_k"].item()) if "router_top_k" in data.files else rank
 
     avg = torch.as_tensor(data["v_avg"], dtype=torch.float32, device=device)
     basis = torch.as_tensor(data["basis"], dtype=torch.float32, device=device)
@@ -47,7 +49,9 @@ def load_components(path: str, device: torch.device):
         raise ValueError("checkpoint v_avg/basis shape mismatch")
 
     shared_fc1 = torch.nn.Linear(dim, router_hidden).to(device)
-    router = ResidualRouter(dim, rank, router_hidden, shared_fc1).to(device)
+    router = ResidualRouter(
+        dim, rank, router_hidden, shared_fc1, top_k=router_top_k
+    ).to(device)
     state = {
         "fc1.weight": torch.as_tensor(data["router_fc1.weight"]),
         "fc1.bias": torch.as_tensor(data["router_fc1.bias"]),
@@ -102,8 +106,7 @@ def get_dynamic_intervention(
         # intervention itself (dynamic mean, residual, and candidate) stays on
         # the original hidden-state scale used by training geometry.
         z = F.normalize(hidden[:, start, :].float(), p=2, dim=-1, eps=1e-8)
-        logits = router.logits(z)
-        coeff = torch.softmax(logits, dim=-1)
+        coeff = router(z)
         # The eval-time residual is direction-only. The training-time
         # ScaleNet is intentionally not used here; gamma controls the fixed
         # residual magnitude for this evaluation run.
@@ -196,7 +199,7 @@ def main() -> None:
         raise ValueError("alpha must be nonzero")
     if not np.isfinite(args.gamma):
         raise ValueError("gamma must be finite")
-    print(f"dynSVD | dim={basis.shape[1]} rank={basis.shape[0]} alpha={alpha} gamma={args.gamma} ")
+    print(f"dynSVD | dim={basis.shape[1]} rank={basis.shape[0]} top_k={router.top_k} alpha={alpha} gamma={args.gamma} ")
     model_path = args.model_dir or HF_NAMES.get(
         args.model_name, args.model_name
     )

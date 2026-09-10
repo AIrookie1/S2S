@@ -20,3 +20,20 @@ mean direction once, and consumes the router output already normalized by
 `normalize_basis_combination`; the adaptive-weight function itself does not
 normalize again. During evaluation tqdm reports `TokenSteer: xx.x%` and the
 mean adaptive weights, followed by final token counts and mean weights.
+
+## Sparse Top-K router training
+
+Router training uses sparse Top-K routing over the learned SVD basis. Only the
+selected K basis coefficients are kept, and they are renormalized to sum to
+one. A Switch-style load-balancing auxiliary loss discourages basis collapse.
+The launchers expose both settings as environment variables:
+
+```bash
+ROUTER_TOP_K=4 LOAD_BALANCE_LOSS_WEIGHT=0.01 \
+  ./script/dyn3d_sga/LLAMA/run_3d_train.sh
+```
+
+The effective Top-K and load-balance weight are stored in each dynSVD
+checkpoint, so evaluation automatically uses the same sparse routing behavior.
+Legacy checkpoints without `router_top_k` remain dense for backward
+compatibility.
