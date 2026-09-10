@@ -653,6 +653,12 @@ def main():
         help="Disable the TruthfulQA generation instruction (default: enabled).",
     )
     parser.add_argument("--weight_kappa", type=float, default=5.0)
+    parser.add_argument(
+        "--margin",
+        type=float,
+        default=0.3,
+        help="Only steer when max(beta, gamma) > alpha + margin.",
+    )
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument(
         "--rebuild_cache",
@@ -826,13 +832,28 @@ def main():
         model.eval()
 
     dynamic_hook = None
+    routing_hook = None
+    steering_stats = {"total": 0, "steered": 0, "weight_count": 0}
     if not args.disable_steering:
+        # Keep the one-token routing probe out of the live token statistics.
+        # It uses a stats-free hook; only the generation hook contributes to
+        # the reported steering ratio.
+        routing_hook = get_3d_dynamic_intervention(
+            avg,
+            basis,
+            router,
+            scale_net,
+            weight_kappa=args.weight_kappa,
+            margin=args.margin,
+        )
         dynamic_hook = get_3d_dynamic_intervention(
             avg,
             basis,
             router,
             scale_net,
             weight_kappa=args.weight_kappa,
+            margin=args.margin,
+            stats=steering_stats,
         )
 
     # ---------------- Pass 3 ----------------
@@ -869,7 +890,7 @@ def main():
             # Cheap router/scale computation from cached h_last.
             # No Q+A0 model forward is repeated here.
             fixed_controls = controls_from_cached_hidden(
-                dynamic_hook,
+                routing_hook,
                 router,
                 scale_net,
                 cached["probe_last_hidden"],
@@ -905,6 +926,10 @@ def main():
                     "answer": steered,
                 },
             }
+        )
+        token_rate = 100.0 * steering_stats["steered"] / max(steering_stats["total"], 1)
+        progress.set_description(
+            f"3D steered generation TokenSteer:{token_rate:.1f}%"
         )
 
     del model
@@ -967,6 +992,7 @@ def main():
         "cache_path": os.path.abspath(args.cache_path),
         "parameters": {
             "weight_kappa": args.weight_kappa,
+            "margin": args.margin,
             "steering_enabled": not args.disable_steering,
             "max_new_tokens": args.max_new_tokens,
             "router_decision": (
@@ -978,6 +1004,13 @@ def main():
             ),
         },
         "summary": summary,
+        "steering_stats": {
+            "steered_tokens": int(steering_stats["steered"]),
+            "total_tokens": int(steering_stats["total"]),
+            "steer_token_ratio": (
+                steering_stats["steered"] / max(steering_stats["total"], 1)
+            ),
+        },
         "results": records,
     }
 

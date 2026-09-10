@@ -144,14 +144,22 @@ def get_3d_dynamic_intervention(
     router,
     scale_net,
     weight_kappa=5.0,
-    
+    margin=0.3,
     eps=1e-8,
     small_angle_threshold=1e-4,
     stats=None,
 ):
-    """Build the 3d rotation hook and count every considered token."""
+    """Build the 3d rotation hook with adaptive-weight margin gating.
+
+    A token is steered only when one of the directional components (the
+    learned mean ``beta`` or router residual ``gamma``) exceeds the current
+    hidden-state component ``alpha`` by ``margin``.  This keeps tokens whose
+    alpha weight is already dominant unchanged.
+    """
     del scale_net  # 3d inference uses the learned router direction.
 
+    # if not np.isfinite(margin) or margin < 0:
+    #     raise ValueError("margin must be finite and non-negative")
     mean_direction = norm(avg, eps)
 
     def hook(output, layer_name=None, start_idx=None):
@@ -190,14 +198,17 @@ def get_3d_dynamic_intervention(
             a, b, c, alpha, beta, gamma, eps, small_angle_threshold
         )
         candidate = rotated_direction * original_norm
+        should_steer = torch.maximum(beta, gamma) > (alpha + margin)
+        edited_segment = torch.where(should_steer, candidate, original)
         edited = hidden.clone()
-        edited[:, start:, :] = candidate.to(hidden.dtype)
+        edited[:, start:, :] = edited_segment.to(hidden.dtype)
         if stats is not None:
             token_count = int(original.shape[0] * original.shape[1])
-            steered_count = token_count
+            steered_count = int(should_steer.sum().item())
             stats["total"] = stats.get("total", 0) + token_count
             stats["steered"] = stats.get("steered", 0) + steered_count
             stats["last_batch_rate"] = steered_count / max(token_count, 1)
+            stats["steer_token_ratio"] = stats["steered"] / max(stats["total"], 1)
             stats["weight_count"] = stats.get("weight_count", 0) + token_count
             stats["alpha_sum"] = stats.get("alpha_sum", 0.0) + float(alpha.sum().item())
             stats["beta_sum"] = stats.get("beta_sum", 0.0) + float(beta.sum().item())
@@ -236,6 +247,7 @@ def main():
     parser.add_argument("--layer", type=int, default=14)
     parser.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
     parser.add_argument("--weight_kappa", "--adaptive_kappa", dest="weight_kappa", type=float, default=5.0, help="Similarity attention sharpness for adaptive weights")
+    parser.add_argument("--margin", type=float, default=0.3, help="Only steer when max(beta, gamma) > alpha + margin")
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--preset", default="qa")
     parser.add_argument("--no_instruction", action="store_true")
@@ -268,7 +280,7 @@ def main():
     data, avg, basis, router, scale_net = load_components(args.checkpoint_path, device)
     print(
         f"3d-dyn | dim={basis.shape[1]} rank={basis.shape[0]} "
-        f"adaptive_kappa={args.weight_kappa}"
+        f"adaptive_kappa={args.weight_kappa} margin={args.margin}"
     )
     model_path = args.model_dir or HF_NAMES.get(args.model_name, args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -316,6 +328,7 @@ def main():
     hook = None if args.no_intervention else get_3d_dynamic_intervention(
         avg, basis, router, scale_net,
         weight_kappa=args.weight_kappa,
+        margin=args.margin,
         eps=args.slerp_eps,
         small_angle_threshold=args.small_angle_threshold,
         stats=stats,
@@ -382,6 +395,7 @@ def main():
             "checkpoint_path": str(args.checkpoint_path),
             "eval_split": args.eval_split,
             "weight_kappa": float(args.weight_kappa),
+            "margin": float(args.margin),
             "bins": int(args.weights_bins),
             "coordinates": {"row": "beta", "column": "gamma", "alpha": "1-beta-gamma"},
             "token_count": int(stats["weight_count"]),
@@ -406,6 +420,7 @@ def main():
         "checkpoint_path": str(args.checkpoint_path),
         "parameters": {
             "weight_kappa": args.weight_kappa,
+            "margin": args.margin,
             "few_shot": bool(args.few_shot),
             "preset": args.preset,
         },

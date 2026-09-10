@@ -7,7 +7,7 @@ set -euo pipefail
 
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
-GPU="${GPU:-0}"
+GPU="${GPU:-1}"
 
 FIG4A_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$FIG4A_DIR/../../script/common.sh"
@@ -16,7 +16,7 @@ source "$FIG4A_DIR/../model_config.sh"
 read -r -a MODEL_KEYS <<< "${MODELS:-llama qwen}"
 read -r -a SEED_VALUES <<< "${SEEDS:-42 123 0}"
 if (( ${#SEED_VALUES[@]} < 2 )); then
-  echo "Fig. 4a requires at least two distinct seeds (SEEDS='42 123')." >&2
+  echo "Fig. 4a requires at least two distinct seeds (SEEDS='42 123 0')." >&2
   exit 2
 fi
 for ((i = 0; i < ${#SEED_VALUES[@]}; i++)); do
@@ -41,6 +41,7 @@ LEARNING_RATE="${LEARNING_RATE:-0.001}"
 SCALE_LOSS_WEIGHT="${SCALE_LOSS_WEIGHT:-0.03}"
 COSINE_LOSS_WEIGHT="${COSINE_LOSS_WEIGHT:-0.003}"
 DEVICE="${DEVICE:-cuda}"
+MARGIN=${MARGIN:--0}
 
 WEIGHT_KAPPA="${WEIGHT_KAPPA:-10}"
 EVAL_SPLIT="${EVAL_SPLIT:-test}"
@@ -125,6 +126,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
           --dtype "$DTYPE" \
           --seed "$SEED" \
           --output_path "$EVAL_JSON" \
+          --margin "$MARGIN" \
           --save_details
         test -s "$EVAL_JSON"
       fi

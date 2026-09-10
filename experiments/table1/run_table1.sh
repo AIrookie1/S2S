@@ -6,7 +6,7 @@ set -euo pipefail
 
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
-GPU="${GPU:-1}"
+GPU="${GPU:-2}"
 TABLE1_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$TABLE1_DIR/../../script/common.sh"
 source "$TABLE1_DIR/../model_config.sh"

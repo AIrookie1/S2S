@@ -4,7 +4,7 @@ set -euo pipefail
 # Run Fig. 4 for both models and both folds. Results are isolated by model/fold.
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
-GPU="${GPU:-3}"
+GPU="${GPU:-1}"
 
 FIG4_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$FIG4_DIR/../../script/common.sh"

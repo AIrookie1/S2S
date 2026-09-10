@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-USE_DATA_MODE="${USE_DATA_MODE:-2}"
+USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+# MARGIN="${MARGIN:-0.3}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -24,33 +25,33 @@ run_dataset() {
   # Add or adjust a dataset block without affecting the others.
   local SVD_RANK ROUTER_HIDDEN EPOCHS BATCH_SIZE LEARNING_RATE VAL_FRACTION POSITIVE_MODE WEIGHT_KAPPA
   POSITIVE_MODE=mean
-  ROUTER_HIDDEN=256; EPOCHS=200; BATCH_SIZE=256; LEARNING_RATE=0.001
-  SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0.003
+  ROUTER_HIDDEN=256; EPOCHS=2000; BATCH_SIZE=256; LEARNING_RATE=0.001
+  SCALE_LOSS_WEIGHT=0.03; COSINE_LOSS_WEIGHT=0
   case "$dataset" in
     boolq)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=50; VAL_FRACTION=0.8; WEIGHT_KAPPA=3.5
+      SVD_RANK=50; VAL_FRACTION=0.8; WEIGHT_KAPPA=4; MARGIN=-0.8
       ;;
     copa)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=60; VAL_FRACTION=0.9; WEIGHT_KAPPA=1.0
+      SVD_RANK=60; VAL_FRACTION=0.9; WEIGHT_KAPPA=10.0; MARGIN=-0.3
       ;;
     storycloze)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=70; VAL_FRACTION=0.6; WEIGHT_KAPPA=2
+      SVD_RANK=70; VAL_FRACTION=0.6; WEIGHT_KAPPA=4; MARGIN=-0.8
       ;;
     mmlu_global)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=40; VAL_FRACTION=0.2; WEIGHT_KAPPA=4
+      SVD_RANK=40; VAL_FRACTION=0.2; WEIGHT_KAPPA=4; MARGIN=0.3
       ;;
     winogrande)
       MODEL=llama3.1-8B-Instruct
       MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-      SVD_RANK=40; VAL_FRACTION=0.4; WEIGHT_KAPPA=3
+      SVD_RANK=40; VAL_FRACTION=0.4; WEIGHT_KAPPA=3; MARGIN=-0.9
       ;;
     *) echo "Unknown dataset: $dataset" >&2; return 2 ;;
   esac
@@ -80,13 +81,13 @@ run_dataset() {
   CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/evaluate_generic.py \
     --model_name "$MODEL" --model_dir "$MODEL_DIR" \
     --dataset "$dataset" --layer "$layer" --checkpoint_path "$checkpoint" \
-    --weight_kappa "$WEIGHT_KAPPA" --output_path "$mc_result"
+    --weight_kappa "$WEIGHT_KAPPA" --margin "$MARGIN" --output_path "$mc_result"
   test -s "$mc_result"
   echo "MC result saved: $mc_result"
 }
 
 run_dataset boolq 12
-run_dataset copa 16
+# run_dataset copa 16
 run_dataset storycloze 27
 # run_dataset mmlu_global 28
 # run_dataset winogrande 16

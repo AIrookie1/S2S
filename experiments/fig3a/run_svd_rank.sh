@@ -15,16 +15,16 @@ set -euo pipefail
 
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-4}"
-GPU="${GPU:-1}"
+GPU="${GPU:-0}"
 
 FIG3A_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$FIG3A_DIR/../../script/common.sh"
 source "$FIG3A_DIR/../model_config.sh"
 
-read -r -a MODEL_KEYS <<< "${MODELS:-qwen}"
+read -r -a MODEL_KEYS <<< "${MODELS:-llama qwen}"
 read -r -a FOLD_INDICES <<< "${FOLDS:-0 1}"
 
-SVD_RANKS=(200 300 400 500 600 700 800 900 1000)
+SVD_RANKS=(100 200 300 400 500 600 700 800 900 1000)
 NUM_FOLDS=2
 POSITIVE_MODE=mean
 
@@ -37,6 +37,7 @@ SCALE_LOSS_WEIGHT="${SCALE_LOSS_WEIGHT:-0.03}"
 COSINE_LOSS_WEIGHT="${COSINE_LOSS_WEIGHT:-0.003}"
 SEED="${SEED:-42}"
 DEVICE="${DEVICE:-cuda}"
+MARGIN=${MARGIN:--0}
 
 WEIGHT_KAPPA="${WEIGHT_KAPPA:-10}"
 EVAL_SPLIT="${EVAL_SPLIT:-test}"
@@ -109,6 +110,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
         --layer "$LAYER" \
         --eval_split "$EVAL_SPLIT" \
         --weight_kappa "$WEIGHT_KAPPA" \
+        --margin "$MARGIN" \
         --device "$DEVICE" \
         --dtype "$DTYPE" \
         --seed "$SEED" \

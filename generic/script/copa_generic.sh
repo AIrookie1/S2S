@@ -3,6 +3,7 @@ set -euo pipefail
 
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+MARGIN="${MARGIN:-0.3}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -58,6 +59,7 @@ run_dataset() {
   CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" generic/evaluate_generic.py \
     --model_name "$MODEL" --model_dir "$MODEL_DIR" \
     --dataset "$dataset" --layer "$layer" --checkpoint_path "$checkpoint" \
+    --margin "$MARGIN" --output_path "$mc_result"
   test -s "$mc_result"
   echo "MC result saved: $mc_result"
 }

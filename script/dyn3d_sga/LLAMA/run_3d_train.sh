@@ -3,6 +3,7 @@ set -euo pipefail
 
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+MARGIN="${MARGIN:-0.3}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL=llama3.1-8B-Instruct
 MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
@@ -27,7 +28,7 @@ EPOCHS=2000
 BATCH_SIZE=256
 LEARNING_RATE=0.001
 SCALE_LOSS_WEIGHT=0.03
-COSINE_LOSS_WEIGHT=0.003
+COSINE_LOSS_WEIGHT=0
 
 # Runtime and paths
 DEVICE=cuda

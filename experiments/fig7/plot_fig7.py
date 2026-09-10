@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -13,104 +14,283 @@ import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap, Normalize
-from matplotlib.patches import Polygon
 
-import sys
+
+# ---------------------------------------------------------------------
+# Project paths
+# ---------------------------------------------------------------------
 
 HERE = Path(__file__).resolve().parent
 EXPERIMENTS_DIR = HERE.parent
+
 if str(EXPERIMENTS_DIR) not in sys.path:
     sys.path.insert(0, str(EXPERIMENTS_DIR))
 
-from plot_common1 import setup_nature_style  # noqa: E402
+
+# ---------------------------------------------------------------------
+# Shared plotting helpers
+# ---------------------------------------------------------------------
+
+from plot_common1 import save_figure, setup_nature_style  # noqa: E402
 
 
-VERTEX_ALPHA = np.array([0.5, math.sqrt(3.0) / 2.0])
-VERTEX_BETA = np.array([0.0, 0.0])
-VERTEX_GAMMA = np.array([1.0, 0.0])
-TRIANGLE_VERTICES = np.vstack([VERTEX_ALPHA, VERTEX_BETA, VERTEX_GAMMA])
+# ---------------------------------------------------------------------
+# Ternary geometry
+# ---------------------------------------------------------------------
 
+VERTEX_ALPHA = np.array(
+    [0.5, math.sqrt(3.0) / 2.0],
+    dtype=float,
+)
+VERTEX_BETA = np.array(
+    [0.0, 0.0],
+    dtype=float,
+)
+VERTEX_GAMMA = np.array(
+    [1.0, 0.0],
+    dtype=float,
+)
+
+TRIANGLE_VERTICES = np.vstack(
+    [
+        VERTEX_ALPHA,
+        VERTEX_BETA,
+        VERTEX_GAMMA,
+    ]
+)
+
+
+# ---------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-dir", type=Path, default=HERE / "data")
-    parser.add_argument("--output-dir", type=Path, default=HERE / "figures")
-    parser.add_argument("--model-label", default=None)
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+    )
+    parser.add_argument(
+        "--input-dir",
+        type=Path,
+        default=HERE / "data",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=HERE / "figures",
+    )
+    parser.add_argument(
+        "--model-label",
+        default=None,
+    )
     return parser.parse_args()
 
 
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+
 def format_kappa(value: float) -> str:
+    """Format kappa cleanly for output filenames."""
     return str(int(value)) if float(value).is_integer() else f"{value:g}"
 
 
-def ternary_xy(alpha: np.ndarray, beta: np.ndarray, gamma: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def ternary_xy(
+    alpha: np.ndarray | float,
+    beta: np.ndarray | float,
+    gamma: np.ndarray | float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Convert ternary coordinates (alpha, beta, gamma) satisfying
+    alpha + beta + gamma = 1 to Cartesian coordinates.
+    """
+    alpha_arr = np.asarray(alpha, dtype=float)
+    beta_arr = np.asarray(beta, dtype=float)
+    gamma_arr = np.asarray(gamma, dtype=float)
+
     points = (
-        alpha[..., None] * VERTEX_ALPHA
-        + beta[..., None] * VERTEX_BETA
-        + gamma[..., None] * VERTEX_GAMMA
+        alpha_arr[..., None] * VERTEX_ALPHA
+        + beta_arr[..., None] * VERTEX_BETA
+        + gamma_arr[..., None] * VERTEX_GAMMA
     )
     return points[..., 0], points[..., 1]
 
 
+# ---------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------
+
 def load_density_files(input_dir: Path) -> list[dict[str, Any]]:
+    """Load Fig. 7 adaptive-weight density JSON files."""
     if not input_dir.is_dir():
-        raise FileNotFoundError(f"Fig. 7 input directory not found: {input_dir}")
+        raise FileNotFoundError(
+            f"Fig. 7 input directory not found: {input_dir}"
+        )
+
     records: list[dict[str, Any]] = []
+
     for path in sorted(input_dir.glob("*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
+
         if payload.get("experiment") != "fig7_adaptive_weight_density":
             continue
-        required = ("weight_kappa", "bins", "histogram", "mean_adaptive_weights")
+
+        required = (
+            "weight_kappa",
+            "bins",
+            "histogram",
+            "mean_adaptive_weights",
+        )
         missing = [key for key in required if key not in payload]
+
         if missing:
-            raise ValueError(f"{path} is missing Fig. 7 fields: {missing}")
+            raise ValueError(
+                f"{path} is missing Fig. 7 fields: {missing}"
+            )
+
         bins = int(payload["bins"])
-        histogram = np.asarray(payload["histogram"], dtype=float)
+        histogram = np.asarray(
+            payload["histogram"],
+            dtype=float,
+        )
+
         if histogram.shape != (bins, bins):
-            raise ValueError(f"{path} histogram shape {histogram.shape} != ({bins}, {bins})")
+            raise ValueError(
+                f"{path} histogram shape "
+                f"{histogram.shape} != ({bins}, {bins})"
+            )
+
         mean = payload["mean_adaptive_weights"]
-        mean_values = np.asarray([mean["alpha"], mean["beta"], mean["gamma"]], dtype=float)
-        if not np.isfinite(mean_values).all() or not np.isclose(mean_values.sum(), 1.0, atol=1e-4):
-            raise ValueError(f"{path} has invalid mean adaptive weights: {mean_values}")
-        records.append({"path": path, "payload": payload, "histogram": histogram, "mean": mean_values})
+        mean_values = np.asarray(
+            [
+                mean["alpha"],
+                mean["beta"],
+                mean["gamma"],
+            ],
+            dtype=float,
+        )
+
+        if not np.isfinite(mean_values).all():
+            raise ValueError(
+                f"{path} has non-finite mean adaptive weights: "
+                f"{mean_values}"
+            )
+
+        if not np.isclose(
+            mean_values.sum(),
+            1.0,
+            atol=1e-4,
+        ):
+            raise ValueError(
+                f"{path} has invalid mean adaptive weights: "
+                f"{mean_values}"
+            )
+
+        records.append(
+            {
+                "path": path,
+                "payload": payload,
+                "histogram": histogram,
+                "mean": mean_values,
+            }
+        )
+
     if not records:
-        raise FileNotFoundError(f"No Fig. 7 density JSON files found in {input_dir}")
-    records.sort(key=lambda item: float(item["payload"]["weight_kappa"]))
+        raise FileNotFoundError(
+            f"No Fig. 7 density JSON files found in {input_dir}"
+        )
+
+    records.sort(
+        key=lambda item: float(item["payload"]["weight_kappa"])
+    )
     return records
 
 
-def density_points(histogram: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+# ---------------------------------------------------------------------
+# Density calculation
+# ---------------------------------------------------------------------
+
+def density_points(
+    histogram: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Convert the beta/gamma histogram into ternary Cartesian positions
+    and log-scaled token density values.
+    """
     bins = histogram.shape[0]
+
     beta_values: list[float] = []
     gamma_values: list[float] = []
     values: list[float] = []
+
     total = float(histogram.sum())
     if total <= 0:
         raise ValueError("Adaptive-weight histogram is empty")
+
     for beta_idx in range(bins):
         for gamma_idx in range(bins):
+            # Only keep cells satisfying beta + gamma < 1.
             if beta_idx + gamma_idx >= bins:
                 continue
-            count = float(histogram[beta_idx, gamma_idx])
-            beta_values.append((beta_idx + 0.5) / bins)
-            gamma_values.append((gamma_idx + 0.5) / bins)
-            values.append(np.log1p(1.0e6 * count / total))
-    alpha = 1.0 - np.asarray(beta_values) - np.asarray(gamma_values)
-    x, y = ternary_xy(alpha, np.asarray(beta_values), np.asarray(gamma_values))
-    return x, y, np.asarray(values)
 
+            count = float(histogram[beta_idx, gamma_idx])
+            beta = (beta_idx + 0.5) / bins
+            gamma = (gamma_idx + 0.5) / bins
+
+            beta_values.append(beta)
+            gamma_values.append(gamma)
+
+            # Tokens per million followed by log1p.
+            values.append(
+                np.log1p(1.0e6 * count / total)
+            )
+
+    beta_arr = np.asarray(beta_values, dtype=float)
+    gamma_arr = np.asarray(gamma_values, dtype=float)
+    alpha_arr = 1.0 - beta_arr - gamma_arr
+
+    x, y = ternary_xy(
+        alpha_arr,
+        beta_arr,
+        gamma_arr,
+    )
+
+    return (
+        x,
+        y,
+        np.asarray(values, dtype=float),
+    )
+
+
+# ---------------------------------------------------------------------
+# Ternary grid
+# ---------------------------------------------------------------------
 
 def add_ternary_grid(ax) -> None:
-    levels = (0.2, 0.4, 0.6, 0.8)
+    """
+    Add alpha/beta/gamma isolines.
+
+    No labels are drawn because Fig. 7 is intended to contain
+    no textual elements.
+    """
+    levels = (
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+    )
+
+    vertex_sets = (
+        (VERTEX_ALPHA, VERTEX_BETA, VERTEX_GAMMA),
+        (VERTEX_BETA, VERTEX_ALPHA, VERTEX_GAMMA),
+        (VERTEX_GAMMA, VERTEX_ALPHA, VERTEX_BETA),
+    )
+
     for value in levels:
-        # Constant alpha, beta and gamma isolines.
-        for vertex, other_a, other_b in (
-            (VERTEX_ALPHA, VERTEX_BETA, VERTEX_GAMMA),
-            (VERTEX_BETA, VERTEX_ALPHA, VERTEX_GAMMA),
-            (VERTEX_GAMMA, VERTEX_ALPHA, VERTEX_BETA),
-        ):
+        for vertex, other_a, other_b in vertex_sets:
             p0 = value * vertex + (1.0 - value) * other_a
             p1 = value * vertex + (1.0 - value) * other_b
+
             ax.plot(
                 [p0[0], p1[0]],
                 [p0[1], p1[1]],
@@ -121,129 +301,338 @@ def add_ternary_grid(ax) -> None:
             )
 
 
-def plot_one(record: dict[str, Any], output_dir: Path, vmax: float, model_label: str) -> Path:
+# ---------------------------------------------------------------------
+# Plot one kappa
+# ---------------------------------------------------------------------
+
+def plot_one(
+    record: dict[str, Any],
+    output_dir: Path,
+    vmax: float,
+) -> Path:
+    """Generate one text-free ternary density figure."""
     payload = record["payload"]
     kappa = float(payload["weight_kappa"])
-    x, y, values = density_points(record["histogram"])
-    triangulation = mtri.Triangulation(x, y)
+
+    x, y, values = density_points(
+        record["histogram"]
+    )
+
+    # -----------------------------------------------------------------
+    # Triangulation
+    # -----------------------------------------------------------------
+
+    triangulation = mtri.Triangulation(
+        x,
+        y,
+    )
+
+    triangles = triangulation.triangles
     centroids = np.column_stack(
         (
-            np.mean(x[triangulation.triangles], axis=1),
-            np.mean(y[triangulation.triangles], axis=1),
+            np.mean(x[triangles], axis=1),
+            np.mean(y[triangles], axis=1),
         )
     )
+
+    sqrt3 = math.sqrt(3.0)
+
     inside = (
         (centroids[:, 1] >= -1e-8)
-        & (centroids[:, 1] <= math.sqrt(3.0) / 2.0 + 1e-8)
-        & (centroids[:, 1] <= math.sqrt(3.0) * centroids[:, 0] + 1e-8)
-        & (centroids[:, 1] <= math.sqrt(3.0) * (1.0 - centroids[:, 0]) + 1e-8)
+        & (
+            centroids[:, 1]
+            <= sqrt3 / 2.0 + 1e-8
+        )
+        & (
+            centroids[:, 1]
+            <= sqrt3 * centroids[:, 0] + 1e-8
+        )
+        & (
+            centroids[:, 1]
+            <= sqrt3 * (1.0 - centroids[:, 0]) + 1e-8
+        )
     )
+
     triangulation.set_mask(~inside)
 
-    fig, ax = plt.subplots(figsize=(5.25, 4.95))
+    # -----------------------------------------------------------------
+    # Figure
+    # -----------------------------------------------------------------
+
+    fig, ax = plt.subplots(
+        figsize=(5.25, 4.95)
+    )
+
+    # Nature-style blue-red density palette.
     cmap = LinearSegmentedColormap.from_list(
         "nature_density",
-        ["#F7FBFF", "#D7E6F5", "#86A8CE", "#3C5488", "#E64B35"],
+        [
+            "#F7FBFF",
+            "#D7E6F5",
+            "#86A8CE",
+            "#3C5488",
+            "#E64B35",
+        ],
         N=256,
     )
-    contour = ax.tricontourf(
+
+    density_max = max(
+        vmax,
+        1e-6,
+    )
+
+    ax.tricontourf(
         triangulation,
         values,
-        levels=np.linspace(0.0, max(vmax, 1e-6), 32),
+        levels=np.linspace(
+            0.0,
+            density_max,
+            32,
+        ),
         cmap=cmap,
-        norm=Normalize(vmin=0.0, vmax=max(vmax, 1e-6)),
+        norm=Normalize(
+            vmin=0.0,
+            vmax=density_max,
+        ),
         antialiased=True,
         extend="max",
         zorder=1,
     )
-    triangle_patch = Polygon(TRIANGLE_VERTICES, closed=True, facecolor="none", edgecolor="none")
-    ax.add_patch(triangle_patch)
-    # The triangulation is masked by triangle-centroid geometry above, so no
-    # additional clipping collection is needed across Matplotlib versions.
+
+    # -----------------------------------------------------------------
+    # Ternary grid
+    # -----------------------------------------------------------------
 
     add_ternary_grid(ax)
+
+    # -----------------------------------------------------------------
+    # Triangle boundary
+    # -----------------------------------------------------------------
+
     ax.plot(
-        [*TRIANGLE_VERTICES[:, 0], TRIANGLE_VERTICES[0, 0]],
-        [*TRIANGLE_VERTICES[:, 1], TRIANGLE_VERTICES[0, 1]],
+        [
+            VERTEX_ALPHA[0],
+            VERTEX_BETA[0],
+            VERTEX_GAMMA[0],
+            VERTEX_ALPHA[0],
+        ],
+        [
+            VERTEX_ALPHA[1],
+            VERTEX_BETA[1],
+            VERTEX_GAMMA[1],
+            VERTEX_ALPHA[1],
+        ],
         color="#222222",
         linewidth=1.5,
+        solid_capstyle="round",
+        solid_joinstyle="round",
         zorder=5,
     )
 
+    # -----------------------------------------------------------------
+    # Mean adaptive-weight marker
+    # -----------------------------------------------------------------
+
     mean = record["mean"]
-    mean_x, mean_y = ternary_xy(mean[0], mean[1], mean[2])
-    ax.scatter([mean_x], [mean_y], marker="*", s=95, color="#222222", edgecolor="white", linewidth=0.8, zorder=7)
-    ax.text(
-        0.98,
-        0.03,
-        f"mean: ({mean[0]:.2f}, {mean[1]:.2f}, {mean[2]:.2f})",
-        transform=ax.transAxes,
-        ha="right",
-        va="bottom",
-        fontsize=10.5,
-        color="#222222",
-        bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "none", "alpha": 0.78},
-        zorder=8,
+    mean_x, mean_y = ternary_xy(
+        mean[0],
+        mean[1],
+        mean[2],
     )
 
-    ax.text(0.5, math.sqrt(3.0) / 2.0 + 0.065, r"$\alpha=1$", ha="center", va="bottom", fontsize=16)
-    ax.text(-0.035, -0.045, r"$\beta=1$", ha="left", va="top", fontsize=16)
-    ax.text(1.035, -0.045, r"$\gamma=1$", ha="right", va="top", fontsize=16)
-    ax.set_title(f"TruthfulQA adaptive weights · $\\kappa={format_kappa(kappa)}$", pad=12)
-    ax.set_aspect("equal", adjustable="box")
-    ax.set_xlim(-0.10, 1.10)
-    ax.set_ylim(-0.10, math.sqrt(3.0) / 2.0 + 0.12)
+    ax.scatter(
+        [float(mean_x)],
+        [float(mean_y)],
+        marker="*",
+        s=600,
+        color="#222222",
+        edgecolor="white",
+        linewidth=1.6,
+        zorder=10,
+    )
+
+    # -----------------------------------------------------------------
+    # Layout
+    #
+    # Intentionally:
+    # - no title
+    # - no alpha/beta/gamma labels
+    # - no axes
+    # - no tick labels
+    # - no legend
+    # - no annotation
+    # - no colorbar
+    # -----------------------------------------------------------------
+
+    ax.set_aspect(
+        "equal",
+        adjustable="box",
+    )
+    ax.set_xlim(
+        -0.06,
+        1.06,
+    )
+    ax.set_ylim(
+        -0.055,
+        math.sqrt(3.0) / 2.0 + 0.055,
+    )
     ax.axis("off")
 
-    colorbar = fig.colorbar(contour, ax=ax, fraction=0.046, pad=0.035, shrink=0.86)
-    colorbar.set_label(r"log$_{e}$(tokens per million + 1)", fontsize=11.5)
-    colorbar.ax.tick_params(labelsize=10)
-    fig.text(
-        0.5,
-        0.015,
-        f"{model_label} · token density over " + r"$\alpha+\beta+\gamma=1$",
-        ha="center",
-        fontsize=10.5,
-        color="#555555",
+    fig.tight_layout(
+        rect=(
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+        ),
+        pad=0.15,
     )
 
-    fig.tight_layout(rect=(0.0, 0.045, 1.0, 1.0), pad=0.5)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    prefix = output_dir / f"fig7_adaptive_weights_kappa{format_kappa(kappa).replace('.', 'p')}"
-    for suffix, kwargs in ((".png", {"dpi": 600}), (".pdf", {}), (".svg", {})):
-        fig.savefig(prefix.with_suffix(suffix), facecolor="white", bbox_inches="tight", pad_inches=0.04, **kwargs)
-    plt.close(fig)
-    return prefix.with_suffix(".png")
+    # -----------------------------------------------------------------
+    # Save
+    # -----------------------------------------------------------------
 
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    kappa_label = format_kappa(
+        kappa
+    ).replace(
+        ".",
+        "p",
+    )
+
+    output_prefix = (
+        output_dir
+        / f"fig7_adaptive_weights_kappa{kappa_label}"
+    )
+
+    # Use the shared Nature-style save helper.
+    save_figure(
+        fig,
+        output_prefix,
+    )
+
+    plt.close(fig)
+
+    return output_prefix.with_suffix(
+        ".png"
+    )
+
+
+# ---------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------
 
 def main() -> None:
+    """Generate all Fig. 7 ternary density figures and a summary manifest."""
     args = parse_args()
+
+    # Apply the exact same global Nature style used by the other figures.
     setup_nature_style()
-    records = load_density_files(args.input_dir)
-    vmax = max(float(np.max(density_points(item["histogram"])[2])) for item in records)
-    label = args.model_label or str(records[0]["payload"].get("model_label") or records[0]["payload"].get("model_name") or "TruthfulQA")
-    outputs = [str(plot_one(item, args.output_dir, vmax, label)) for item in records]
+
+    records = load_density_files(
+        args.input_dir
+    )
+
+    # One shared density scale across every kappa figure.
+    vmax = max(
+        float(
+            np.max(
+                density_points(
+                    item["histogram"]
+                )[2]
+            )
+        )
+        for item in records
+    )
+
+    # Kept for the manifest only.
+    model_label = (
+        args.model_label
+        or str(
+            records[0]["payload"].get("model_label")
+            or records[0]["payload"].get("model_name")
+            or "TruthfulQA"
+        )
+    )
+
+    outputs = [
+        str(
+            plot_one(
+                item,
+                args.output_dir,
+                vmax,
+            )
+        )
+        for item in records
+    ]
+
+    # -----------------------------------------------------------------
+    # Metadata manifest
+    # -----------------------------------------------------------------
 
     manifest = {
         "experiment": "fig7_adaptive_weight_density",
-        "model_label": label,
+        "model_label": model_label,
         "density_transform": "log1p(tokens / total_tokens * 1e6)",
-        "vertex_order": ["alpha", "beta", "gamma"],
+        "vertex_order": [
+            "alpha",
+            "beta",
+            "gamma",
+        ],
+        "figure_text": False,
+        "colorbar": False,
+        "shared_density_scale": True,
         "files": [
             {
-                "kappa": float(item["payload"]["weight_kappa"]),
-                "input": str(item["path"]),
+                "kappa": float(
+                    item["payload"]["weight_kappa"]
+                ),
+                "input": str(
+                    item["path"]
+                ),
                 "figure": output,
-                "mean_adaptive_weights": item["mean"].tolist(),
-                "token_count": int(item["payload"].get("token_count", 0)),
+                "mean_adaptive_weights": (
+                    item["mean"].tolist()
+                ),
+                "token_count": int(
+                    item["payload"].get(
+                        "token_count",
+                        0,
+                    )
+                ),
             }
-            for item, output in zip(records, outputs)
+            for item, output in zip(
+                records,
+                outputs,
+            )
         ],
     }
-    (args.output_dir / "fig7_density_summary.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+
+    summary_path = (
+        args.output_dir
+        / "fig7_density_summary.json"
     )
-    print(f"Generated {len(outputs)} ternary density figures in {args.output_dir}")
+
+    summary_path.write_text(
+        json.dumps(
+            manifest,
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    print(
+        f"Generated {len(outputs)} "
+        f"ternary density figures in "
+        f"{args.output_dir}"
+    )
+
     for output in outputs:
         print(output)
 

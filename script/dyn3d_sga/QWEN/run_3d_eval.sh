@@ -4,6 +4,7 @@ set -euo pipefail
 # Auxiliary router data: 0 keeps the current negative-only training objective.
 USE_DATA_MODE="${USE_DATA_MODE:-0}"
 AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
+MARGIN="${MARGIN:-0.3}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODEL=Qwen2.5-7B-Instruct
@@ -32,6 +33,7 @@ EVAL_ARGS=(
   --layer "$LAYER"
   --eval_split "${EVAL_SPLIT:-test}"
   --weight_kappa "$WEIGHT_KAPPA"
+  --margin "$MARGIN"
   --device "$DEVICE"
   --dtype "$DTYPE"
   --output_path "$OUTPUT_PATH"

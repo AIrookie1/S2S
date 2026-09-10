@@ -91,8 +91,11 @@ def calculate_option_score(model, tokenizer, base_prompt, option_text,
 
 
 def format_progress(correct, total, steering_stats):
-    """Format live accuracy and cumulative Dyn3D weight means."""
-    text = f"Acc:{correct / max(total, 1):.4f}"
+    """Format live accuracy, gated steering rate, and weight means."""
+    steer_total = steering_stats.get("total", 0)
+    steered = steering_stats.get("steered", 0)
+    steer_pct = 100.0 * steered / max(steer_total, 1)
+    text = f"Acc:{correct / max(total, 1):.4f} Steer:{steer_pct:.1f}%"
     count = steering_stats.get("weight_count", 0)
     if count:
         alpha = steering_stats.get("alpha_sum", 0.0) / count
@@ -285,6 +288,8 @@ def main():
     parser.add_argument('--layer', type=int, default=14)
     parser.add_argument('--checkpoint_path', type=str, required=True)
     parser.add_argument('--weight_kappa', type=float, default=5.0)
+    parser.add_argument('--margin', type=float, default=0.3,
+                        help='Only steer when max(beta, gamma) > alpha + margin')
     parser.add_argument('--disable_steering', action='store_true')
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
@@ -328,6 +333,7 @@ def main():
             router,
             scale_net,
             weight_kappa=args.weight_kappa,
+            margin=args.margin,
             stats=steering_stats,
         )
 
@@ -353,7 +359,7 @@ def main():
     print(f"Steering:   {'OFF' if args.disable_steering else 'ON'}")
     if not args.disable_steering:
         print(
-            f"Parameters: kappa={args.weight_kappa}, "
+            f"Parameters: kappa={args.weight_kappa}, margin={args.margin}, "
         )
         if steering_stats['total'] > 0:
             steer_pct = steering_stats['steered'] / steering_stats['total'] * 100
@@ -382,11 +388,16 @@ def main():
             "steering_enabled": not args.disable_steering,
             "parameters": {
                 "weight_kappa": args.weight_kappa,
+                "margin": args.margin,
                 "seed": args.seed,
             },
             "steering_stats": {
                 "steered_tokens": int(steering_stats.get("steered", 0)),
                 "total_tokens": int(steering_stats.get("total", 0)),
+                "steer_token_ratio": (
+                    steering_stats.get("steered", 0)
+                    / max(steering_stats.get("total", 0), 1)
+                ),
                 "mean_adaptive_weights": (
                     {
                         "alpha": steering_stats["alpha_sum"] / count,
