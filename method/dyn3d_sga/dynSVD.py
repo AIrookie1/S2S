@@ -234,7 +234,7 @@ def _build_training_pairs(activations, labels, q_indices, choice_indices, positi
 
 
 
-def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = 4, energy: float = .95, router_hidden: int = 256, epochs: int = 20, batch_size: int = 128, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 1.0, cosine_loss_weight: float = 1.0, router_mask: np.ndarray | None = None, use_zpos_router: bool = True, use_data_mode: int | None = None, aux_interp_count: int = 1, mean_mask: np.ndarray | None = None, vector_loss_weight: float = 1.0, router_top_k: int = 4, load_balance_loss_weight: float = 0.01) -> tuple[dict, list[dict], dict]:
+def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray, train_mask: np.ndarray, rank: int | None = None, energy: float = .99, router_hidden: int = 256, epochs: int = 2000, batch_size: int = 256, learning_rate: float = 1e-3, device: str = "cpu", seed: int = 42, scale_loss_weight: float = 0.03, cosine_loss_weight: float = 0.0, router_mask: np.ndarray | None = None, use_zpos_router: bool = True, use_data_mode: int | None = None, aux_interp_count: int = 8, mean_mask: np.ndarray | None = None, vector_loss_weight: float = 1.0, router_top_k: int = 40, load_balance_loss_weight: float = 0.02) -> tuple[dict, list[dict], dict]:
     set_seed(seed)
     if use_data_mode is None:
         use_data_mode = 1 if use_zpos_router else 0
@@ -276,7 +276,7 @@ def fit_dynamic_svd(h_neg: np.ndarray, h_pos: np.ndarray, q_indices: np.ndarray,
     v_avg = vectors[mean_tr].mean(0)
     residual = vectors[tr] - v_avg
     # SVD uses the complete selected fold, while v_avg uses only mean_tr
-    # (the 80% within-fold subset). Auxiliary samples are excluded from both.
+    # (the complementary mean-training subset). Auxiliary samples are excluded from both.
     print(
         f"Computing SVD: residual_shape={tuple(residual.shape)} device={dev}",
         flush=True,

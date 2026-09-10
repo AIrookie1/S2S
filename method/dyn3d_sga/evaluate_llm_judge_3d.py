@@ -652,11 +652,11 @@ def main():
         action="store_true",
         help="Disable the TruthfulQA generation instruction (default: enabled).",
     )
-    parser.add_argument("--weight_kappa", type=float, default=5.0)
+    parser.add_argument("--weight_kappa", type=float, default=8.0)
     parser.add_argument(
         "--margin",
         type=float,
-        default=0.3,
+        default=-0.3,
         help="Only steer when max(beta, gamma) > alpha + margin.",
     )
     parser.add_argument("--max_samples", type=int, default=None)

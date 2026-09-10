@@ -76,20 +76,22 @@ def main() -> None:
     args = p.parse_args()
     if args.layer < 0 or args.batch_size <= 0 or args.max_length < 0:
         raise ValueError("layer must be nonnegative, batch_size positive, max_length nonnegative")
-    if args.device != "cuda" or not torch.cuda.is_available():
-        raise RuntimeError("This reference-compatible extractor requires CUDA")
-    device = torch.device("cuda")
+    if args.device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("--device cuda requested but CUDA is not available")
+    device = torch.device(args.device)
+    dtype_map = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
+    torch_dtype = dtype_map[args.dtype]
     model_path = args.model_dir or HF_NAMES.get(args.model_name, args.model_name)
-    print(f"Loading model: {model_path} | device={device} | dtype=torch.float16")
+    print(f"Loading model: {model_path} | device={device} | dtype={torch_dtype}")
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     if tokenizer.pad_token_id is None:
         if tokenizer.eos_token_id is None:
             raise ValueError("tokenizer has neither pad_token nor eos_token")
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
-        model_path, low_cpu_mem_usage=True, torch_dtype=torch.float16,
+        model_path, low_cpu_mem_usage=True, torch_dtype=torch_dtype,
         trust_remote_code=True,
-    ).to("cuda")
+    ).to(device)
     # model = AutoModelForCausalLM.from_pretrained(
     #     model_path,
     #     low_cpu_mem_usage=True,

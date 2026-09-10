@@ -143,8 +143,8 @@ def get_3d_dynamic_intervention(
     basis,
     router,
     scale_net,
-    weight_kappa=5.0,
-    margin=0.3,
+    weight_kappa=8.0,
+    margin=-0.3,
     eps=1e-8,
     small_angle_threshold=1e-4,
     stats=None,
@@ -246,8 +246,8 @@ def main():
     parser.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
     parser.add_argument("--layer", type=int, default=14)
     parser.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
-    parser.add_argument("--weight_kappa", "--adaptive_kappa", dest="weight_kappa", type=float, default=5.0, help="Similarity attention sharpness for adaptive weights")
-    parser.add_argument("--margin", type=float, default=0.3, help="Only steer when max(beta, gamma) > alpha + margin")
+    parser.add_argument("--weight_kappa", "--adaptive_kappa", dest="weight_kappa", type=float, default=8.0, help="Similarity attention sharpness for adaptive weights")
+    parser.add_argument("--margin", type=float, default=-0.3, help="Only steer when max(beta, gamma) > alpha + margin")
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--preset", default="qa")
     parser.add_argument("--no_instruction", action="store_true")

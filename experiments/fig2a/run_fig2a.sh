@@ -22,7 +22,7 @@ EVAL_FOLD=1
 FEATURE_PATH=features/${MODEL}_layer${LAYER}.npz
 CHECKPOINT=features/${MODEL}_layer${LAYER}_dynSVD_fold${ROUTER_FOLD}_mean.npz
 
-GPU=3
+GPU=0
 NUM_QUESTIONS=5
 TOP_K=10
 SEED=3

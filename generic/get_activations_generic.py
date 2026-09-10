@@ -37,6 +37,7 @@ def main():
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--dtype', choices=['float16', 'bfloat16', 'float32'], default='float16')
 
     args = parser.parse_args()
     set_seed(args.seed)
@@ -49,9 +50,10 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    dtype_map = {'float16': torch.float16, 'bfloat16': torch.bfloat16, 'float32': torch.float32}
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        torch_dtype=torch.float16,
+        torch_dtype=dtype_map[args.dtype],
         device_map="auto",
         trust_remote_code=True
     )

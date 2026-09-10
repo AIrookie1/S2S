@@ -287,13 +287,14 @@ def main():
                         choices=['copa', 'storycloze', 'mmlu_global', 'winogrande', 'boolq'])
     parser.add_argument('--layer', type=int, default=14)
     parser.add_argument('--checkpoint_path', type=str, required=True)
-    parser.add_argument('--weight_kappa', type=float, default=5.0)
-    parser.add_argument('--margin', type=float, default=0.3,
+    parser.add_argument('--weight_kappa', type=float, default=8.0)
+    parser.add_argument('--margin', type=float, default=-0.3,
                         help='Only steer when max(beta, gamma) > alpha + margin')
     parser.add_argument('--disable_steering', action='store_true')
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--dtype', choices=['float16', 'bfloat16', 'float32'], default='float16')
     parser.add_argument(
         '--output_path', type=str, default=None,
         help='Optional path for the dataset MC1 result JSON')
@@ -305,8 +306,9 @@ def main():
     model_path = args.model_dir if args.model_dir else HF_NAMES.get(args.model_name, args.model_name)
     print(f"Loading model: {model_path}")
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    dtype_map = {'float16': torch.float16, 'bfloat16': torch.bfloat16, 'float32': torch.float32}
     model = AutoModelForCausalLM.from_pretrained(
-        model_path, torch_dtype=torch.float16, device_map="auto", trust_remote_code=True)
+        model_path, torch_dtype=dtype_map[args.dtype], device_map="auto", trust_remote_code=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load the Dyn3D checkpoint trained on this dataset's original training split.
@@ -325,7 +327,7 @@ def main():
         hook_fn = None
     else:
         print(
-            f">> Mode: DYN3D (kappa={args.weight_kappa}, "
+            f">> Mode: DYN3D (kappa={args.weight_kappa}, margin={args.margin})"
         )
         hook_fn = get_3d_dynamic_intervention(
             avg,
