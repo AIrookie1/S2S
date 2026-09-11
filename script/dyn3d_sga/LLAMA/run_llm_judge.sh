@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# Auxiliary router data: 0 keeps the current negative-only training objective.
-USE_DATA_MODE="${USE_DATA_MODE:-0}"
-AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
-MARGIN="${MARGIN:-0.3}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODEL=llama3.1-8B-Instruct
-MODEL_DIR=/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct
-LAYER=${LAYER:-14}; GPU=${GPU:-3}; FOLD_IDX=${FOLD_IDX:-1}
-source "$SCRIPT_DIR/../../common.sh"
-export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
-CHECKPOINT_PATH="${CHECKPOINT_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}_dynSVD_fold${FOLD_IDX}_mean.npz}"
-OUTPUT_DIR="${OUTPUT_DIR:-$JUDGE_DIR/llama_truthfulqa}"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+source "$REPO_ROOT/hyperparams/dyn3d_sga/LLAMA/truthfulqa.sh"
+source "$REPO_ROOT/script/common.sh"
+
+GPU="${GPU:-0}"
+CHECKPOINT_PATH="${CHECKPOINT_PATH:-$CHECKPOINT_ROOT/dyn3d_sga/truthfulqa/$MODEL/${MODEL}_layer${LAYER}_dynSVD_fold${FOLD_IDX}_${POSITIVE_MODE}.npz}"
+OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_ROOT/truthfulqa/dyn3d_sga/$MODEL/llm_judge}"
 TRUTH_JUDGE_PATH="${TRUTH_JUDGE_PATH:-/mnt/nas-public-bing/pinxuanli11/truthfulqa-truth-judge-llama2-7B}"
 INFO_JUDGE_PATH="${INFO_JUDGE_PATH:-/mnt/nas-public-bing/pinxuanli11/truthfulqa-info-judge-llama2-7B}"
 mkdir -p "$OUTPUT_DIR"; test -s "$CHECKPOINT_PATH"
-CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/evaluate_llm_judge.py "$MODEL" --model_dir "$MODEL_DIR" --checkpoint_path "$CHECKPOINT_PATH" --layer "$LAYER" --output_dir "$OUTPUT_DIR" --truth_judge_path "$TRUTH_JUDGE_PATH" --info_judge_path "$INFO_JUDGE_PATH" ${EXTRA_ARGS:-}
+CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/evaluate_llm_judge.py "$MODEL"   --model_dir "$MODEL_DIR" --checkpoint_path "$CHECKPOINT_PATH" --layer "$LAYER"   --output_dir "$OUTPUT_DIR" --truth_judge_path "$TRUTH_JUDGE_PATH"   --info_judge_path "$INFO_JUDGE_PATH" ${EXTRA_ARGS:-}

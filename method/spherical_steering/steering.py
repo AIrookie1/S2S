@@ -64,9 +64,7 @@ def spherical_geometric_logic(x, mu_T, mu_H, kappa, alpha, beta):
     
     # Compute steering strength (linear interpolation above threshold)
     t = alpha * (delta - beta) / (1.0 - beta)
-
     t = torch.clamp(t, 0.0, 1.0)
-    # print(f"Steering strength: {t.item()}")
     
     # Compute angle from truthful prototype
     theta = torch.acos(cos_T)

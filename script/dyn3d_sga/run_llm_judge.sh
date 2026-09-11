@@ -1,5 +1,8 @@
-
-# Auxiliary router data: 0 keeps the current negative-only training objective.
-USE_DATA_MODE="${USE_DATA_MODE:-0}"
-AUX_INTERP_COUNT="${AUX_INTERP_COUNT:-8}"
-MARGIN="${MARGIN:-0.3}"
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODEL_KEY="${1:-LLAMA}"
+case "${MODEL_KEY^^}" in
+  LLAMA|QWEN) exec bash "$SCRIPT_DIR/${MODEL_KEY^^}/run_llm_judge.sh" ;;
+  *) echo "usage: $0 [LLAMA|QWEN]" >&2; exit 2 ;;
+esac

@@ -1,9 +1,12 @@
 # Hyperparameter layout
 
-`base.sh` is the single canonical source for shared Dyn3D defaults. The current baseline uses SVD energy `0.99`, router Top-K `40`, load-balancing loss weight `0.02`, evaluation/judge `weight_kappa=8`, and `margin=-0.3`.
+Hyperparameters are grouped by steering method first, then by model.
 
-- `truthfulqa/config.sh`: shared main-pipeline settings used by LLAMA/QWEN scripts.
-- `generic/<dataset>/config.sh`: five dataset-specific generic-task configurations.
-- `experiments/<ablation>/config.sh`: one configuration per ablation. Only the ablated variable is swept; all other values inherit the baseline.
+- `dyn3d_sga/common.sh`: parameters genuinely shared by Dyn3D runs.
+- `dyn3d_sga/LLAMA|QWEN/truthfulqa.sh`: model-specific TruthfulQA settings; Llama/Qwen keep their own model, layer and default fold.
+- `dyn3d_sga/LLAMA|QWEN/generic/*.sh`: generic-task settings. Dataset hyperparameters are intentionally identical between Llama and Qwen; only model identity/path differs.
+- `dyn3d_sga/experiments/*.sh`: model-independent experiment sweep grids.
+- `spherical_steering/LLAMA|QWEN/truthfulqa.sh`: values copied from the uploaded Spherical-Steering quickstarts.
+- `spherical_steering/LLAMA|QWEN/generic/*.sh`: values copied from the uploaded generic quickstart; the same dataset settings are used for both models for now.
 
-All shell variables remain environment-overridable, e.g. `GPU=1 EPOCHS=100 bash ...`.
+Every shell variable remains environment-overridable.

@@ -272,3 +272,22 @@ def write_aggregate_csv(
                     row[f"fold{fold}_MC1"] = float(series["fold_values"][fold, idx])
                 writer.writerow(row)
     return csv_path
+
+
+# Backward-compatible API used by the experiment scripts restored from dyn6.
+def setup_plot() -> None:
+    setup_nature_style()
+
+def plot_mean_sd(ax, series_list) -> None:
+    plot_model_series(ax, series_list)
+
+def finish(ax, xlabel: str) -> None:
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("MC1")
+    finish_axis(ax)
+
+def save(fig, prefix: Path) -> None:
+    save_figure(fig, prefix)
+
+def write_csv(prefix: Path, x_key: str, series_list):
+    return write_aggregate_csv(prefix, x_key, series_list)

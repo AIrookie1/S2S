@@ -122,7 +122,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--output_prefix",
-        default="./experiments/fig2/figures/fig2_router_weights",
+        default="./results/experiment/fig2/fig2_router_weights",
         help="Output path prefix; extensions are added automatically.",
     )
     return parser.parse_args()
