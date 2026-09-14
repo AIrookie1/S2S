@@ -15,7 +15,7 @@ def main():
     mpl.rcParams.update({'font.family':'sans-serif','pdf.fonttype':42,'svg.fonttype':'none'})
     fig,ax=plt.subplots(figsize=(6.4,4.2))
     for key,label in labels.items(): ax.plot(layers,[x[1][key] for x in rows],marker='o',markersize=3,label=label)
-    ax.set_xlabel('Layer'); ax.set_ylabel('MC1'); ax.set_ylim(0,1); ax.legend(frameon=False,ncol=2); fig.tight_layout(); a.output_prefix.parent.mkdir(parents=True,exist_ok=True)
+    ax.set_xlabel('Layer'); ax.set_ylabel('MC1'); ax.set_ylim(0.3,0.7); ax.legend(frameon=False,ncol=2); fig.tight_layout(); a.output_prefix.parent.mkdir(parents=True,exist_ok=True)
     for ext in ['png','pdf','svg']: fig.savefig(a.output_prefix.with_suffix('.'+ext),dpi=300 if ext=='png' else None)
     plt.close(fig); print(f'Saved {a.output_prefix}.[png|pdf|svg]')
 if __name__=='__main__': main()

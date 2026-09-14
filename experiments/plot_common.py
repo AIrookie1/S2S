@@ -7,7 +7,6 @@ import csv
 import json
 from pathlib import Path
 from typing import Any
-
 import matplotlib as mpl
 import numpy as np
 
@@ -39,21 +38,21 @@ def setup_nature_style() -> None:
         {
             "font.family": "sans-serif",
             "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-            "font.size": 8.0,
-            "axes.labelsize": 9.0,
-            "axes.titlesize": 9.0,
-            "xtick.labelsize": 7.5,
-            "ytick.labelsize": 7.5,
-            "legend.fontsize": 7.5,
-            "axes.linewidth": 0.8,
-            "lines.linewidth": 1.5,
-            "lines.markersize": 4.5,
+            "font.size": 18.0,
+            "axes.labelsize": 19.0,
+            "axes.titlesize": 19.0,
+            "xtick.labelsize": 17.5,
+            "ytick.labelsize": 17.5,
+            "legend.fontsize": 17.5,
+            "axes.linewidth": 1.8,
+            "lines.linewidth": 2.5,
+            "lines.markersize": 10.5,
             "xtick.direction": "out",
             "ytick.direction": "out",
-            "xtick.major.width": 0.8,
-            "ytick.major.width": 0.8,
-            "xtick.major.size": 3.0,
-            "ytick.major.size": 3.0,
+            "xtick.major.width": 1.8,
+            "ytick.major.width": 1.8,
+            "xtick.major.size": 5.0,
+            "ytick.major.size": 5.0,
             "axes.unicode_minus": False,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
@@ -200,7 +199,7 @@ def plot_model_series(ax, series_list: list[dict[str, Any]]) -> None:
             markeredgecolor=style["color"],
             markeredgewidth=0.9,
             linewidth=1.5,
-            markersize=4.5,
+            markersize=8,
             elinewidth=0.9,
             capsize=2.2,
             capthick=0.9,

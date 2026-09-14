@@ -30,7 +30,7 @@ The uploaded `vector_utils.py` is preserved. The experiment compares:
 
 For spherical steering, a vector `v` is mapped to antipodal prototypes `mu_T = normalize(v)` and `mu_H = -mu_T`. Every scored choice receives the intervention. Pair-specific MC1 scores the truthful/false members of every pair with the same pair vector and requires the truthful answer to win every pairwise comparison.
 
-`prepare_fold_features.py` adds the fold metadata required by the uploaded `vector_utils.py` to base `*_dynSVD_pairs.npz` files. `run.sh` can generate those base files first with `RUN_EXTRACT=1`.
+`steering_vector_ablation` now keeps exactly one base `*_dynSVD_pairs.npz` per layer. `vector_utils.py` reconstructs fold 0/1 membership in memory from `q_indices` using the same deterministic `np.array_split` rule; no fold-specific NPZ copies are created.
 
 ## Restored from dyn6
 

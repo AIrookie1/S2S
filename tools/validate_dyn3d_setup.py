@@ -40,6 +40,22 @@ def main() -> int:
         if (ROOT / "experiments" / legacy).exists():
             errors.append(f"legacy experiment directory remains: experiments/{legacy}")
 
+    # steering_vector_ablation must use one base pairs.npz per layer and derive
+    # folds in memory; the old helper that materialized fold NPZ copies is gone.
+    steering_dir = ROOT / "experiments" / "steering_vector_ablation"
+    if (steering_dir / "prepare_fold_features.py").exists():
+        errors.append(
+            "steering_vector_ablation still contains prepare_fold_features.py"
+        )
+    for name in ("run.sh", "evaluate.py"):
+        p = steering_dir / name
+        if p.is_file():
+            text = p.read_text(encoding="utf-8", errors="ignore")
+            if "_fold{fold}" in text or "prepare_fold_features.py" in text:
+                errors.append(
+                    f"steering_vector_ablation/{name} still depends on materialized fold features"
+                )
+
     for method in ("dyn3d_sga", "spherical_steering"):
         for model in MODELS:
             base = ROOT / "hyperparams" / method / model
@@ -55,6 +71,21 @@ def main() -> int:
     for p in (ROOT / "experiments").rglob("*"):
         if p.is_file() and p.suffix.lower() in generated:
             errors.append(f"generated artifact still inside experiments: {p.relative_to(ROOT)}")
+
+    # Catch literal path-template placeholders inside bash ${VAR:-default} expansions.
+    # bash -n accepts these, but a literal closing brace such as {layer} can terminate
+    # the outer parameter expansion early at runtime.
+    literal_template = re.compile(r"(?<!\$)\{(?:layer|fold)\}")
+    for p in ROOT.rglob("*.sh"):
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            if ":-" in line and literal_template.search(line):
+                errors.append(
+                    f"unsafe literal template in bash default expansion: "
+                    f"{p.relative_to(ROOT)}:{lineno}: {line.strip()}"
+                )
 
     # Catch references to deleted layouts/names in executable source. README/history text is allowed.
     stale = re.compile(r"experiments/model_config\.sh|hyperparams/(?:LLAMA|QWEN|generic)/|script/spherical/")
@@ -77,7 +108,7 @@ def main() -> int:
         print("Validation failed:")
         print("\n".join(f"- {e}" for e in errors))
         return 1
-    print("Validation OK: Python/shell syntax, restored experiment files, reorganized hyperparameters, result hygiene, and method entrypoints all pass.")
+    print("Validation OK: Python/shell syntax, single-pairs in-memory fold loading, restored experiment files, reorganized hyperparameters, result hygiene, and method entrypoints all pass.")
     return 0
 
 
