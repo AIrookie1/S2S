@@ -313,7 +313,7 @@ def main():
 
     # Load the Dyn3D checkpoint trained on this dataset's original training split.
     print(f"Loading Dyn3D checkpoint: {args.checkpoint_path}")
-    _, avg, basis, router, scale_net = load_components(
+    _, avg, basis, router = load_components(
         args.checkpoint_path, torch.device(device)
     )
 
@@ -333,7 +333,6 @@ def main():
             avg,
             basis,
             router,
-            scale_net,
             weight_kappa=args.weight_kappa,
             margin=args.margin,
             stats=steering_stats,

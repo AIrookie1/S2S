@@ -11,20 +11,20 @@ Pass 2 (cacheable):
     Q + A0 -> one normal forward pass
     cache the target-layer hidden state of the LAST token (h_last)
 
-Router/scale preparation (cheap, repeated for the current checkpoint):
+Router preparation (cheap, repeated for the current checkpoint):
     Feed cached h_last through the EXISTING get_3d_dynamic_intervention hook
-    once, capture router/scale_net outputs, and freeze those outputs for
+    once, capture the router output, and freeze that output for
     this question.
 
 Pass 3:
     Fresh Q-only generation.
     At every autoregressive step, apply the original 3D SLERP intervention
     to the CURRENT LAST TOKEN, exactly like the existing generation logic,
-    but with router/scale outputs fixed from Pass 2.
+    but with the router output fixed from Pass 2.
 
 The Pass-1 answer and Pass-2 last-token hidden state are saved in a .pt
 cache. On later runs they are reused automatically, so changing checkpoint,
-router, scale_net, or weight_kappa does not require rerunning Pass 1/2.
+router or weight_kappa does not require rerunning Pass 1/2.
 Pass 3 is rerun normally.
 
 The final JSON contains both unsteered and steered answers plus Truth/Info
@@ -145,14 +145,8 @@ def _atomic_torch_save(obj, path):
 # ---------------------------------------------------------------------------
 
 @contextlib.contextmanager
-def fixed_dynamic_controls(router, scale_net, controls):
-    """
-    Force router/scale_net to return the outputs computed from Pass-2 h_last.
-
-    The original get_3d_dynamic_intervention hook is still called in Pass 3,
-    so its projection/3D-SLERP implementation stays untouched. Only the
-    question-level routing/scaling decision is frozen.
-    """
+def fixed_dynamic_controls(router, controls):
+    """Force router to return the output computed from Pass-2 h_last."""
     handles = []
 
     if controls is None:
@@ -169,22 +163,6 @@ def fixed_dynamic_controls(router, scale_net, controls):
             return _tree_like(fixed_router, live_output)
 
         handles.append(router.register_forward_hook(_override_router))
-
-    if (
-        scale_net is not None
-        and controls.get("scale_net") is not None
-    ):
-        if not hasattr(scale_net, "register_forward_hook"):
-            raise TypeError(
-                "scale_net is not an nn.Module; cannot freeze its output safely."
-            )
-
-        fixed_scale = controls["scale_net"]
-
-        def _override_scale(_module, _inputs, live_output):
-            return _tree_like(fixed_scale, live_output)
-
-        handles.append(scale_net.register_forward_hook(_override_scale))
 
     try:
         yield
@@ -203,7 +181,6 @@ def generate_answer(
     *,
     prompt_text=None,
     router=None,
-    scale_net=None,
     fixed_controls=None,
 ):
     """
@@ -238,7 +215,7 @@ def generate_answer(
             )
 
             controls_ctx = (
-                fixed_dynamic_controls(router, scale_net, fixed_controls)
+                fixed_dynamic_controls(router, fixed_controls)
                 if edit is not None
                 else _NullContext()
             )
@@ -323,27 +300,16 @@ def capture_probe_last_hidden(
 
 
 # ---------------------------------------------------------------------------
-# Convert cached h_last -> fixed router/scale outputs
+# Convert cached h_last -> fixed router output
 # ---------------------------------------------------------------------------
 
 def controls_from_cached_hidden(
     dynamic_hook,
     router,
-    scale_net,
     probe_last_hidden,
     layer_name,
 ):
-    """
-    Use the EXISTING dynamic intervention code to derive routing controls
-    from one cached Pass-2 h_last.
-
-    This avoids reimplementing/guessing the internal preprocessing used by
-    get_3d_dynamic_intervention (centering, basis projection, router input,
-    scale input, etc.).
-
-    We call the hook on a one-token dummy layer output containing h_last,
-    capture router/scale_net outputs, then freeze these outputs during Pass 3.
-    """
+    """Derive and capture the fixed router output from one cached h_last."""
     captures = {}
     handles = []
 
@@ -357,24 +323,9 @@ def controls_from_cached_hidden(
 
     handles.append(router.register_forward_hook(_capture_router))
 
-    if scale_net is not None and hasattr(scale_net, "register_forward_hook"):
-        def _capture_scale(_module, _inputs, output):
-            captures["scale_net"] = _tree_to_cpu(output)
-
-        handles.append(scale_net.register_forward_hook(_capture_scale))
-
-    # Match the device of the 3D components when possible.
-    component_device = None
-    for module in (router, scale_net):
-        if module is None:
-            continue
-        try:
-            component_device = next(module.parameters()).device
-            break
-        except (StopIteration, AttributeError):
-            pass
-
-    if component_device is None:
+    try:
+        component_device = next(router.parameters()).device
+    except (StopIteration, AttributeError):
         component_device = (
             torch.device("cuda")
             if torch.cuda.is_available()
@@ -389,15 +340,11 @@ def controls_from_cached_hidden(
 
     errors = []
     try:
-        # The hook used by TraceDict normally receives (output, layer_name),
-        # while start_idx is supplied by partial(...). Try the same form first.
         with torch.no_grad():
             try:
                 dynamic_hook(dummy, layer_name, start_idx=0)
             except Exception as exc_tensor:
                 errors.append(("tensor", repr(exc_tensor)))
-
-                # Some transformer hooks operate on tuple(layer_hidden, ...).
                 try:
                     dynamic_hook((dummy,), layer_name, start_idx=0)
                 except Exception as exc_tuple:
@@ -416,10 +363,8 @@ def controls_from_cached_hidden(
             f"Attempts: {details}"
         )
 
-    return {
-        "router": captures["router"],
-        "scale_net": captures.get("scale_net"),
-    }
+    return {"router": captures["router"]}
+
 
 
 # ---------------------------------------------------------------------------
@@ -695,14 +640,12 @@ def main():
 
     # Load checkpoint/router first. The checkpoint supplies the fold test IDs.
     print(f"Loading 3D checkpoint: {args.checkpoint_path}")
-    checkpoint, avg, basis, router, scale_net = load_components(
+    checkpoint, avg, basis, router = load_components(
         args.checkpoint_path,
         device,
     )
 
     router.eval()
-    if scale_net is not None and hasattr(scale_net, "eval"):
-        scale_net.eval()
 
     test_ids = sorted(
         int(x)
@@ -842,7 +785,6 @@ def main():
             avg,
             basis,
             router,
-            scale_net,
             weight_kappa=args.weight_kappa,
             margin=args.margin,
         )
@@ -850,7 +792,6 @@ def main():
             avg,
             basis,
             router,
-            scale_net,
             weight_kappa=args.weight_kappa,
             margin=args.margin,
             stats=steering_stats,
@@ -887,12 +828,11 @@ def main():
                 prompt_text=generation_prompt,
             )
         else:
-            # Cheap router/scale computation from cached h_last.
+            # Cheap router computation from cached h_last.
             # No Q+A0 model forward is repeated here.
             fixed_controls = controls_from_cached_hidden(
                 routing_hook,
                 router,
-                scale_net,
                 cached["probe_last_hidden"],
                 layer_name,
             )
@@ -906,7 +846,6 @@ def main():
                 max_new_tokens=args.max_new_tokens,
                 prompt_text=generation_prompt,
                 router=router,
-                scale_net=scale_net,
                 fixed_controls=fixed_controls,
             )
 

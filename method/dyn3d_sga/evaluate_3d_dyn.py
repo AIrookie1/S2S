@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.dyn3d_sga.dynSVD import normalize_basis_combination
+from method.dyn3d_sga.dynSVD import normalized_basis_combination
 from method.dyn3d_sga.evaluate_dynSVD import load_components
 from method.dyn3d_sga.eval_utils import (
     HF_NAMES,
@@ -45,11 +45,8 @@ def adaptive_3way_weights(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict]:
     """Return Similarity-Graph Adaptive 2-Slerp weights.
 
-    ``x``, ``v`` and ``r`` must already be unit vectors.  Keeping that
-    contract explicit avoids repeatedly normalizing the same vectors in the
-    hot inference hook: the caller normalizes the raw hidden state once,
-    ``v`` is pre-normalized once per evaluation, and ``r`` is already
-    normalized by ``normalize_basis_combination``.
+    ``x`` and ``v`` are unit vectors. ``r`` is the L2-normalized routed
+    residual ``coeff @ basis``, matching the training objective.
     """
     if not np.isfinite(kappa) or kappa <= 0:
         raise ValueError("weight kappa must be finite and positive")
@@ -80,7 +77,7 @@ def adaptive_3way_weights(
         ],
         dim=-1,
     )
-    weights = torch.softmax(centrality * temperature, dim=-1)
+    weights = torch.softmax((centrality) * temperature, dim=-1)
     return (
         weights[..., 0:1],
         weights[..., 1:2],
@@ -126,6 +123,10 @@ def two_slerp_sym(a, b, c, alpha, beta, gamma, eps=1e-8, small_angle_threshold=1
     first = two_slerp(a, b, c, alpha, beta, gamma, eps, small_angle_threshold)
     second = two_slerp(b, c, a, beta, gamma, alpha, eps, small_angle_threshold)
     third = two_slerp(c, a, b, gamma, alpha, beta, eps, small_angle_threshold)
+
+    # first = torch.ones_like(first)
+    # third = torch.ones_like(third)
+
     return norm(alpha * first + beta * second + gamma * third, eps)#
 
 
@@ -142,7 +143,6 @@ def get_3d_dynamic_intervention(
     avg,
     basis,
     router,
-    scale_net,
     weight_kappa=8.0,
     margin=-0.3,
     eps=1e-8,
@@ -156,8 +156,6 @@ def get_3d_dynamic_intervention(
     hidden-state component ``alpha`` by ``margin``.  This keeps tokens whose
     alpha weight is already dominant unchanged.
     """
-    del scale_net  # 3d inference uses the learned router direction.
-
     # if not np.isfinite(margin) or margin < 0:
     #     raise ValueError("margin must be finite and non-negative")
     mean_direction = norm(avg, eps)
@@ -178,12 +176,10 @@ def get_3d_dynamic_intervention(
         )
         original = hidden[:, start:, :].float()
         original_norm = torch.linalg.vector_norm(original, dim=-1, keepdim=True).clamp_min(eps)
-        # 3D inference intentionally works on unit directions for its spherical
-        # interpolation. The final-token copy is also the normalized Router
-        # input; this is separate from the raw-scale training geometry.
+        # Normalize both the Router input and routed residual, matching training.
         a = norm(original, eps)
         coeff = router(a[:, -1, :])
-        residual = normalize_basis_combination(coeff, basis).float()
+        residual = normalized_basis_combination(coeff, basis).float()
         b = mean_direction.view(1, 1, -1).expand_as(a)
         c = residual.view(residual.shape[0], 1, -1).expand_as(a)
         alpha, beta, gamma, weight_info = adaptive_3way_weights(
@@ -277,7 +273,7 @@ def main():
 
     set_seed(args.seed)
     device = resolve_device(args.device)
-    data, avg, basis, router, scale_net = load_components(args.checkpoint_path, device)
+    data, avg, basis, router = load_components(args.checkpoint_path, device)
     print(
         f"3d-dyn | dim={basis.shape[1]} rank={basis.shape[0]} "
         f"adaptive_kappa={args.weight_kappa} margin={args.margin}"
@@ -326,7 +322,7 @@ def main():
             (args.weights_bins, args.weights_bins), dtype=np.int64
         )
     hook = None if args.no_intervention else get_3d_dynamic_intervention(
-        avg, basis, router, scale_net,
+        avg, basis, router,
         weight_kappa=args.weight_kappa,
         margin=args.margin,
         eps=args.slerp_eps,

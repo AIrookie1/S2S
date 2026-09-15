@@ -193,7 +193,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     print(f"Loading dynSVD checkpoint: {args.checkpoint_path}")
-    ckpt, avg, basis, router, scale_net = load_components(args.checkpoint_path, torch.device(device))
+    ckpt, avg, basis, router = load_components(args.checkpoint_path, torch.device(device))
     test_q_indices = set(int(x) for x in np.asarray(ckpt['test_q_indices']).reshape(-1))
     fold_match = re.search(r'fold(\d+)', args.checkpoint_path)
     fold_idx = int(fold_match.group(1)) if fold_match else 0
@@ -208,7 +208,7 @@ def main():
     else:
         print(f"Steering: ON (alpha={args.alpha})")
         base_hook_fn = get_dynamic_intervention(
-            avg, basis, router, scale_net, args.alpha,
+            avg, basis, router, args.alpha,
             gamma=1.0, stats=steering_stats)
 
     # Load questions from HuggingFace dataset

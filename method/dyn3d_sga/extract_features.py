@@ -110,7 +110,7 @@ def main() -> None:
     ) = build_question_vectors(activations, data["labels"], data["q_indices"], data["choice_indices"])
     # Keep both raw and normalized pair states for compatibility. The current
     # trainer uses the raw fields for geometry/residual/SVD and normalizes only
-    # the copies sent into Router/ScaleNet.
+    # the copies sent into Router.
     z_neg_raw, z_pos_raw = z_neg, z_pos
     z_neg = z_neg_raw / np.maximum(np.linalg.norm(z_neg_raw, axis=1, keepdims=True), 1e-12)
     z_pos = z_pos_raw / np.maximum(np.linalg.norm(z_pos_raw, axis=1, keepdims=True), 1e-12)

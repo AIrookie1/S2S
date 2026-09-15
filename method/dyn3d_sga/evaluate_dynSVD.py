@@ -16,11 +16,7 @@ ROOT = Path.cwd()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.dyn3d_sga.dynSVD import (
-    ResidualRouter,
-    ScaleNet,
-    normalize_basis_combination,
-)
+from method.dyn3d_sga.dynSVD import ResidualRouter, normalized_basis_combination
 from method.dyn3d_sga.eval_utils import (
     HF_NAMES,
     calculate_scores_fewshot,
@@ -40,7 +36,6 @@ def load_components(path: str, device: torch.device):
     dim = int(data["hidden_dim"].item())
     rank = int(data["rank"].item())
     router_hidden = int(data["router_hidden"].item())
-    # Old checkpoints did not store router_top_k and used dense softmax.
     router_top_k = int(data["router_top_k"].item()) if "router_top_k" in data.files else rank
 
     avg = torch.as_tensor(data["v_avg"], dtype=torch.float32, device=device)
@@ -48,9 +43,8 @@ def load_components(path: str, device: torch.device):
     if avg.shape != (dim,) or basis.shape != (rank, dim):
         raise ValueError("checkpoint v_avg/basis shape mismatch")
 
-    shared_fc1 = torch.nn.Linear(dim, router_hidden).to(device)
     router = ResidualRouter(
-        dim, rank, router_hidden, shared_fc1, top_k=router_top_k
+        dim, rank, router_hidden, top_k=router_top_k
     ).to(device)
     state = {
         "fc1.weight": torch.as_tensor(data["router_fc1.weight"]),
@@ -59,26 +53,14 @@ def load_components(path: str, device: torch.device):
         "fc2.bias": torch.as_tensor(data["router_fc2.bias"]),
     }
     router.load_state_dict(state)
-    if not all(k in data.files for k in ("scale_fc1.weight", "scale_fc1.bias", "scale_fc2.weight", "scale_fc2.bias")):
-        raise KeyError("checkpoint missing ScaleNet weights; retrain dynSVD checkpoint")
-    scale_net = ScaleNet(dim, router_hidden, shared_fc1).to(device)
-    scale_state = {
-        "fc1.weight": torch.as_tensor(data["scale_fc1.weight"]),
-        "fc1.bias": torch.as_tensor(data["scale_fc1.bias"]),
-        "fc2.weight": torch.as_tensor(data["scale_fc2.weight"]),
-        "fc2.bias": torch.as_tensor(data["scale_fc2.bias"]),
-    }
-    scale_net.load_state_dict(scale_state)
-    scale_net.eval()
     router.eval()
-    return data, avg, basis, router, scale_net
+    return data, avg, basis, router
 
 
 def get_dynamic_intervention(
     avg,
     basis,
     router,
-    scale_net,
     alpha: float,
     gamma: float = 1.0,
     stats: dict | None = None,
@@ -107,18 +89,14 @@ def get_dynamic_intervention(
         # the original hidden-state scale used by training geometry.
         z = F.normalize(hidden[:, start, :].float(), p=2, dim=-1, eps=1e-8)
         coeff = router(z)
-        # The eval-time residual is direction-only. The training-time
-        # ScaleNet is intentionally not used here; gamma controls the fixed
-        # residual magnitude for this evaluation run.
-        routed_direction = normalize_basis_combination(coeff, basis)
-        residual = routed_direction
+        # Keep inference aligned with training: normalize coeff @ basis.
+        residual = normalized_basis_combination(coeff, basis)
         dynamic = avg.unsqueeze(0).expand(z.shape[0], -1)
         original = hidden[:, start:, :].float()
         steering = (
             alpha * dynamic[:, None, :]
             + gamma * residual[:, None, :]
         )
-        # steering = alpha * (dynamic[:, None, :]+ scale * residual[:, None, :])
         candidate = original + steering
         edited = hidden.clone()
         edited[:, start:, :] = candidate.to(hidden.dtype)
@@ -172,7 +150,7 @@ def main() -> None:
         default="test",
     )
     parser.add_argument("--alpha", type=float, default=None)
-    parser.add_argument("--gamma", type=float, default=1.0, help="Fixed magnitude applied to the routed residual direction during eval (ScaleNet is not used).")
+    parser.add_argument("--gamma", type=float, default=1.0, help="Multiplier applied to the L2-normalized routed residual (coeff @ basis) during eval.")
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--preset", default="qa")
     parser.add_argument("--no_instruction", action="store_true")
@@ -193,7 +171,7 @@ def main() -> None:
 
     set_seed(args.seed)
     device = resolve_device(args.device)
-    data, avg, basis, router, scale_net = load_components(args.checkpoint_path, device)
+    data, avg, basis, router = load_components(args.checkpoint_path, device)
     alpha = 1.0 if args.alpha is None else args.alpha
     if alpha == 0:
         raise ValueError("alpha must be nonzero")
@@ -281,7 +259,6 @@ def main() -> None:
             avg,
             basis,
             router,
-            scale_net,
             alpha,
             args.gamma,
             stats,

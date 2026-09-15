@@ -8,5 +8,6 @@ Hyperparameters are grouped by steering method first, then by model.
 - `dyn3d_sga/experiments/*.sh`: model-independent experiment sweep grids.
 - `spherical_steering/LLAMA|QWEN/truthfulqa.sh`: values copied from the uploaded Spherical-Steering quickstarts.
 - `spherical_steering/LLAMA|QWEN/generic/*.sh`: values copied from the uploaded generic quickstart; the same dataset settings are used for both models for now.
+- `l2s/LLAMA|QWEN/truthfulqa.sh`: L2S training defaults plus the unchanged Spherical-Steering `KAPPA/ALPHA/BETA` evaluation values.
 
 Every shell variable remains environment-overridable.

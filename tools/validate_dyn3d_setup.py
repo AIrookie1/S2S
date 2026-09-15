@@ -66,6 +66,18 @@ def main() -> int:
                 if not (base / "generic" / f"{ds}.sh").is_file():
                     errors.append(f"missing {base.relative_to(ROOT)}/generic/{ds}.sh")
 
+    # L2S is TruthfulQA-only for now, so it needs model/truthfulqa configs and
+    # the complete train/eval/judge launcher set but no generic-task tree.
+    for model in MODELS:
+        base = ROOT / "hyperparams" / "l2s" / model
+        for f in ("model.sh", "truthfulqa.sh"):
+            if not (base / f).is_file():
+                errors.append(f"missing {base.relative_to(ROOT)}/{f}")
+        script_base = ROOT / "script" / "l2s" / model
+        for f in ("run.sh", "run_train.sh", "run_eval.sh", "run_llm_judge.sh"):
+            if not (script_base / f).is_file():
+                errors.append(f"missing {script_base.relative_to(ROOT)}/{f}")
+
     # No generated result artifacts should live under experiments anymore.
     generated = {".png", ".pdf", ".svg", ".csv", ".json", ".jsonl"}
     for p in (ROOT / "experiments").rglob("*"):

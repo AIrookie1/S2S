@@ -22,7 +22,7 @@ prepare_feature(){
 }
 train_dyn3d(){
   local feature_path="$1" checkpoint_path="$2" fold_idx="$3" val_fraction="$4" seed="$5" router_top_k="$6" load_balance_weight="$7"
-  run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py --feature_path "$feature_path" --positive_mode "$POSITIVE_MODE" --output_path "$checkpoint_path" --num_folds "$NUM_FOLDS" --fold_idx "$fold_idx" --val_fraction "$val_fraction" --energy "$SVD_ENERGY" --router_hidden "$ROUTER_HIDDEN" --router_top_k "$router_top_k" --vector_loss_weight "$VECTOR_LOSS_WEIGHT" --scale_loss_weight "$SCALE_LOSS_WEIGHT" --cosine_loss_weight "$COSINE_LOSS_WEIGHT" --load_balance_loss_weight "$load_balance_weight" --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" --learning_rate "$LEARNING_RATE" --device "$DEVICE" --seed "$seed" --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
+  run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dynSVD.py --feature_path "$feature_path" --positive_mode "$POSITIVE_MODE" --output_path "$checkpoint_path" --num_folds "$NUM_FOLDS" --fold_idx "$fold_idx" --val_fraction "$val_fraction" --energy "$SVD_ENERGY" --router_hidden "$ROUTER_HIDDEN" --router_top_k "$router_top_k" --load_balance_loss_weight "$load_balance_weight" --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" --learning_rate "$LEARNING_RATE" --device "$DEVICE" --seed "$seed" --use_data_mode "$USE_DATA_MODE" --aux_interp_count "$AUX_INTERP_COUNT"
   require_file "$checkpoint_path"
 }
 eval_dyn3d(){
