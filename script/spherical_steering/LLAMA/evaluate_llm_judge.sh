@@ -15,4 +15,4 @@ OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_DIR/llm_judge}"
 TRUTH_JUDGE_PATH="${TRUTH_JUDGE_PATH:-/mnt/nas-public-bing/pinxuanli11/truthfulqa-truth-judge-llama2-7B}"
 INFO_JUDGE_PATH="${INFO_JUDGE_PATH:-/mnt/nas-public-bing/pinxuanli11/truthfulqa-info-judge-llama2-7B}"
 mkdir -p "$OUTPUT_DIR"; test -s "$PROTOTYPE_PATH"
-CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/spherical_steering/evaluate_llm_judge.py "$MODEL"   --prototype_path "$PROTOTYPE_PATH" --model_dir "$MODEL_DIR" --layer "$LAYER"   --kappa "$KAPPA" --alpha "$ALPHA" --beta "$BETA" --seed "$SEED"   --truth_judge_path "$TRUTH_JUDGE_PATH" --info_judge_path "$INFO_JUDGE_PATH"   --output_dir "$OUTPUT_DIR" ${EXTRA_ARGS:-}
+CUDA_VISIBLE_DEVICES=1 "$PYTHON_BIN" method/spherical_steering/evaluate_llm_judge.py "$MODEL"   --prototype_path "$PROTOTYPE_PATH" --model_dir "$MODEL_DIR" --layer "$LAYER"   --kappa "$KAPPA" --alpha "$ALPHA" --beta "$BETA" --seed "$SEED"   --truth_judge_path "$TRUTH_JUDGE_PATH" --info_judge_path "$INFO_JUDGE_PATH"   --output_dir "$OUTPUT_DIR" ${EXTRA_ARGS:-}

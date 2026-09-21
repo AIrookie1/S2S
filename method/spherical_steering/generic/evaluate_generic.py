@@ -27,7 +27,10 @@ from functools import partial
 from datasets import load_dataset, concatenate_datasets
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from baukit import TraceDict
-
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', '..', '..')
+)
+sys.path.insert(0, PROJECT_ROOT)
 from method.spherical_steering.steering import get_spherical_intervention
 from method.spherical_steering.generic.utils_generic import HF_NAMES, MMLU_CATEGORIES, set_seed
 

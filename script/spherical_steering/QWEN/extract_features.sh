@@ -10,4 +10,8 @@ RESULT_DIR="${RESULT_DIR:-$RESULT_ROOT/truthfulqa/spherical_steering/${MODEL}}"
 mkdir -p "$(dirname "$FEATURE_PATH")" "$PROTO_DIR" "$RESULT_DIR"
 
 CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/spherical_steering/get_activations.py "$MODEL"   --model_dir "$MODEL_DIR" --layer "$LAYER" --save_dir "$(dirname "$FEATURE_PATH")"
-test -s "$FEATURE_PATH"
+if [[ ! -s "$FEATURE_PATH" ]]; then
+  echo "[ERROR] Feature extraction finished without creating: $FEATURE_PATH" >&2
+  exit 1
+fi
+echo "[OK] Features: $FEATURE_PATH"

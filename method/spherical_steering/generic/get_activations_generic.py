@@ -19,8 +19,12 @@ import argparse
 import torch
 import numpy as np
 import os
+import sys
 from transformers import AutoTokenizer, AutoModelForCausalLM
-
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', '..', '..')
+)
+sys.path.insert(0, PROJECT_ROOT)
 from method.spherical_steering.generic.utils_generic import HF_NAMES, set_seed, get_dataset_data, get_layer_activations
 
 

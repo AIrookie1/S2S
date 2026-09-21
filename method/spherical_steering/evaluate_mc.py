@@ -22,8 +22,10 @@ import numpy as np
 from tqdm import tqdm
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import sys
+from pathlib import Path
+# sys.path.insert(0, './truthfulqa')
 
-sys.path.insert(0, './TruthfulQA')
 from truthfulqa.utilities import split_multi_answer, format_best, format_prompt_with_answer_strings
 from truthfulqa.models import MC_calcs, set_columns
 from truthfulqa.presets import preset_map

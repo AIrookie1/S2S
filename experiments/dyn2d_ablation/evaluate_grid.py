@@ -143,6 +143,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Dyn2D strength x SLERP MC1 ablation")
     parser.add_argument("model_name")
     parser.add_argument("--checkpoint_path", required=True)
+    parser.add_argument("--expected_fold", type=int, default=None)
     parser.add_argument("--model_dir", default=None)
     parser.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
     parser.add_argument("--layer", type=int, default=14)
@@ -170,6 +171,11 @@ def main() -> None:
         default="float16",
     )
     parser.add_argument("--output_dir", required=True)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Reuse already completed grid cells from the output CSV.",
+    )
     args = parser.parse_args()
 
     if any(not 0.0 <= value <= 1.0 for value in args.slerps):
@@ -179,6 +185,11 @@ def main() -> None:
     device = resolve_device(args.device)
     checkpoint, avg, predictor = load_components(args.checkpoint_path, device)
     fold_idx = int(np.asarray(checkpoint["fold_idx"]).item()) if "fold_idx" in checkpoint.files else None
+    if args.expected_fold is not None and fold_idx != args.expected_fold:
+        checkpoint.close()
+        raise ValueError(
+            f"checkpoint fold mismatch: expected {args.expected_fold}, found {fold_idx}"
+        )
 
     model_path = args.model_dir or HF_NAMES.get(args.model_name, args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -220,10 +231,53 @@ def main() -> None:
     csv_path = output_dir / "dyn2d_ablation_mc1.csv"
     json_path = output_dir / "dyn2d_ablation_results.json"
 
+    requested_cells = {
+        (float(strength), float(slerp_t))
+        for slerp_t in args.slerps
+        for strength in args.strengths
+    }
     cells: list[dict] = []
+    completed: set[tuple[float, float]] = set()
+    if args.resume and csv_path.exists():
+        with csv_path.open(newline="", encoding="utf-8") as handle:
+            previous = list(csv.DictReader(handle))
+        for row in previous:
+            if row.get("model_name") != args.model_name:
+                raise ValueError(
+                    f"resume CSV model mismatch: {row.get('model_name')} != {args.model_name}"
+                )
+            row_fold = int(float(row["fold"])) if row.get("fold") not in (None, "", "None") else None
+            if row_fold != fold_idx:
+                raise ValueError(
+                    f"resume CSV fold mismatch: {row_fold} != checkpoint fold {fold_idx}"
+                )
+            cell = {
+                key: (float(value) if key not in {"model_name"} and value not in ("", "None") else value)
+                for key, value in row.items()
+            }
+            cell["layer"] = int(float(row["layer"]))
+            cell["fold"] = row_fold
+            for key in ("steered_tokens", "total_tokens", "prediction_count"):
+                if key in row and row[key] not in ("", "None"):
+                    cell[key] = int(float(row[key]))
+            cell_key = (float(row["strength"]), float(row["slerp_t"]))
+            if cell_key not in requested_cells:
+                raise ValueError(
+                    f"resume CSV contains cell {cell_key} outside the requested grid; "
+                    "remove the old fold output or disable --resume"
+                )
+            if cell_key in completed:
+                raise ValueError(f"resume CSV contains duplicate cell {cell_key}")
+            cells.append(cell)
+            completed.add(cell_key)
+
     outer = tqdm(args.slerps, desc="SLERP rows")
     for slerp_t in outer:
         for strength in args.strengths:
+            key = (float(strength), float(slerp_t))
+            if key in completed:
+                outer.set_postfix(strength=f"{strength:g}", t=f"{slerp_t:g}", status="reuse")
+                continue
             metrics, steering_stats = evaluate_one(
                 model=model,
                 tokenizer=tokenizer,
@@ -256,6 +310,7 @@ def main() -> None:
             )
 
             # Persist after every cell so long sweeps preserve completed work.
+            cells.sort(key=lambda row: (float(row["slerp_t"]), float(row["strength"])))
             with csv_path.open("w", newline="", encoding="utf-8") as handle:
                 writer = csv.DictWriter(handle, fieldnames=list(cells[0].keys()))
                 writer.writeheader()

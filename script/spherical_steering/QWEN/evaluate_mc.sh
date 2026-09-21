@@ -13,6 +13,13 @@ FOLD_IDX="${FOLD_IDX:-0}"
 PROTOTYPE_PATH="${PROTOTYPE_PATH:-$PROTO_DIR/${MODEL}_layer${LAYER}_fold${FOLD_IDX}.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_DIR/mc}"
 OUTPUT_PATH="${OUTPUT_PATH:-$OUTPUT_DIR/${MODEL}_l${LAYER}_fold${FOLD_IDX}_a${ALPHA}_b${BETA}.json}"
-mkdir -p "$OUTPUT_DIR"; test -s "$PROTOTYPE_PATH"
+mkdir -p "$OUTPUT_DIR"
+if [[ ! -s "$PROTOTYPE_PATH" ]]; then
+  echo "[ERROR] Missing prototype: $PROTOTYPE_PATH" >&2
+  echo "[HINT] Generate features first, then run compute_prototypes.sh." >&2
+  echo "       bash $SCRIPT_DIR/extract_features.sh" >&2
+  echo "       bash $SCRIPT_DIR/compute_prototypes.sh" >&2
+  exit 1
+fi
 CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/spherical_steering/evaluate_mc.py "$MODEL"   --prototype_path "$PROTOTYPE_PATH" --model_dir "$MODEL_DIR" --layer "$LAYER"   --kappa "$KAPPA" --alpha "$ALPHA" --beta "$BETA" --seed "$SEED"   --output_path "$OUTPUT_PATH" --save_details ${EXTRA_ARGS:-}
 test -s "$OUTPUT_PATH"

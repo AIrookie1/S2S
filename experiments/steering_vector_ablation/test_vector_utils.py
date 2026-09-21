@@ -49,6 +49,10 @@ class PairVectorDataTest(unittest.TestCase):
         self.assertEqual(set(data.vectors), {(0, 1), (0, 2)})
         np.testing.assert_array_equal(data.vectors[(0, 1)], [2.0, 0.0])
         np.testing.assert_array_equal(data.vectors[(0, 2)], [0.0, 4.0])
+        np.testing.assert_array_equal(data.raw_negative_states[(0, 1)], z_neg_raw[0])
+        np.testing.assert_array_equal(data.raw_positive_states[(0, 1)], z_pos_raw[0])
+        np.testing.assert_array_equal(data.raw_negative_states[(0, 2)], z_neg_raw[1])
+        np.testing.assert_array_equal(data.raw_positive_states[(0, 2)], z_pos_raw[1])
         np.testing.assert_array_equal(data.shared_mean, [1.0, 2.0])
         self.assertEqual(data.num_train_pairs, 2)
         self.assertEqual(data.fold_idx, 0)
@@ -79,6 +83,8 @@ class PairVectorDataTest(unittest.TestCase):
             )
             data = load_pair_vector_data(str(path))
 
+        self.assertEqual(data.raw_positive_states, {})
+        self.assertEqual(data.raw_negative_states, {})
         with self.assertRaises(KeyError):
             find_answer_rows(data, 0, "best", ["false a", "false b"])
 

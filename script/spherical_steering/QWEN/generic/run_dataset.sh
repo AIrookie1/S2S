@@ -17,6 +17,6 @@ require_file(){ [[ "$DRY_RUN" == 1 || -s "$1" ]] || { echo "Missing required fil
 FEATURE_PATH="$GEN_FEATURE_DIR/${MODEL}_${DATASET}_train_l${LAYER}.npz"
 PROTOTYPE_PATH="$GEN_PROTO_DIR/${MODEL}_${DATASET}_train_l${LAYER}_proto.npz"
 OUTPUT_PATH="$RESULT_DIR/${MODEL}_${DATASET}_mc1.json"
-if [[ "$RUN_EXTRACT" == 1 ]]; then run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/spherical_steering/generic/get_activations_generic.py --model_name "$MODEL" --model_dir "$MODEL_DIR" --dataset "$DATASET" --split train --layer "$LAYER" --save_dir "$GEN_FEATURE_DIR" --seed "$SEED" --dtype "$DTYPE"; fi
+if [[ "$RUN_EXTRACT" == 1 ]]; then run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/spherical_steering/generic/get_activations_generic.py --model_name "$MODEL" --model_dir "$MODEL_DIR" --dataset "$DATASET" --split train --layer "$LAYER" --save_dir "$GEN_FEATURE_DIR" --seed "$SEED"; fi
 if [[ "$RUN_PROTOTYPE" == 1 ]]; then require_file "$FEATURE_PATH"; run_cmd "$PYTHON_BIN" method/spherical_steering/generic/get_prototypes_generic.py --feature_file "$FEATURE_PATH" --save_dir "$GEN_PROTO_DIR"; fi
 if [[ "$RUN_EVAL" == 1 ]]; then require_file "$PROTOTYPE_PATH"; run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/spherical_steering/generic/evaluate_generic.py --model_name "$MODEL" --model_dir "$MODEL_DIR" --dataset "$DATASET" --layer "$LAYER" --prototype_path "$PROTOTYPE_PATH" --kappa "$KAPPA" --alpha "$ALPHA" --beta "$BETA" --seed "$SEED" --dtype "$DTYPE" --output_path "$OUTPUT_PATH"; fi

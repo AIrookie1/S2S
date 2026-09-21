@@ -1,6 +1,6 @@
 """Pair-level vector loading for the steering-vector ablation.
 
-The experiment keeps one base ``*_dyn3d_pairs.npz`` file per layer.  Fold
+The experiment keeps one base ``*_dynSVD_pairs.npz`` file per layer.  Fold
 membership is reconstructed in memory from ``q_indices`` using the same
 deterministic ``np.array_split`` rule that was previously used to materialize
 ``*_fold0.npz`` / ``*_fold1.npz`` copies.
@@ -18,6 +18,8 @@ class PairVectorData:
     """Pair vectors restricted to the training questions for one outer fold."""
 
     vectors: dict[tuple[int, int], np.ndarray]
+    raw_positive_states: dict[tuple[int, int], np.ndarray]
+    raw_negative_states: dict[tuple[int, int], np.ndarray]
     shared_mean: np.ndarray
     train_questions: np.ndarray
     choices: np.ndarray
@@ -78,7 +80,7 @@ def load_pair_vector_data(
 
     Preferred mode
     --------------
-    Pass ``fold_idx`` and read the single base ``*_dyn3d_pairs.npz`` file.
+    Pass ``fold_idx`` and read the single base ``*_dynSVD_pairs.npz`` file.
     Training-question membership is reconstructed in memory, so no fold-specific
     NPZ files are created or required.
 
@@ -164,9 +166,22 @@ def load_pair_vector_data(
                 raise ValueError(f"Duplicate answer-pair key: {key}")
             vectors[key] = vector
 
+        raw_positive_states: dict[tuple[int, int], np.ndarray] = {}
+        raw_negative_states: dict[tuple[int, int], np.ndarray] = {}
         if {"z_pos_raw", "z_neg_raw"}.issubset(features.files):
             raw_pos = np.asarray(features["z_pos_raw"], dtype=np.float32)[train_mask]
             raw_neg = np.asarray(features["z_neg_raw"], dtype=np.float32)[train_mask]
+            if len(raw_pos) != len(train_vectors) or len(raw_neg) != len(train_vectors):
+                raise ValueError("Raw pair endpoints must align with pair vectors")
+            for positive_row, negative_row, z_pos, z_neg in zip(
+                train_positive_rows,
+                train_negative_rows,
+                raw_pos,
+                raw_neg,
+            ):
+                key = (int(positive_row), int(negative_row))
+                raw_positive_states[key] = z_pos
+                raw_negative_states[key] = z_neg
             reconstruction_error = np.linalg.norm(
                 raw_neg + train_vectors - raw_pos,
                 axis=1,
@@ -178,6 +193,8 @@ def load_pair_vector_data(
         shared_mean = train_vectors.mean(axis=0, dtype=np.float64).astype(np.float32)
         return PairVectorData(
             vectors=vectors,
+            raw_positive_states=raw_positive_states,
+            raw_negative_states=raw_negative_states,
             shared_mean=shared_mean,
             train_questions=np.sort(np.unique(train_questions)),
             choices=np.asarray(features["choices"]).astype(str),

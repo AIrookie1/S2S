@@ -1,20 +1,23 @@
-"""Layer-wise comparison of raw-vs-mean and linear-vs-spherical steering.
+"""GT-only layer-wise MC1 evaluation for the steering-vector ablation.
 
-Four conditions are evaluated on the same training-fold MC1 questions:
-  1. linear + exact answer-pair vector
-  2. linear + shared mean vector
-  3. spherical + exact answer-pair vector
-  4. spherical + shared mean vector
+For each MC1 question:
+  * score the truthful answer with no intervention;
+  * for each false answer, build the exact pair direction
+        v_ij = z_pos_raw - z_neg_raw
+    and apply the additive intervention
+        h <- h + v_ij
+    from the final prompt token through the answer span at the selected layer;
+  * count the question correct iff the truthful-answer sequence log-probability
+    is larger than every steered false-answer sequence log-probability.
 
-Each layer uses exactly one base ``*_dyn3d_pairs.npz`` file.  Fold 0/1
-membership is reconstructed in memory from that file; no fold-specific feature
-NPZ files are required.
+``calculate_scores_zeroshot`` supplies ``start_idx = len(prompt_ids) - 1`` to the
+hook.  Therefore the final prompt hidden state (which predicts the first answer
+token) and subsequent answer hidden states are edited.  This is the causal span
+that contributes to the answer sequence likelihood used by MC1.
 
-Every scored choice is intervened on.  For an exact answer-pair vector v_ij,
-the truthful and false candidate in that pair are both scored with the same
-intervention.  MC1 is one only when the truthful answer wins every pairwise
-comparison.  For the shared mean, one common intervention is used for the
-truthful answer and all false candidates.
+Only ``gt_neg_to_pos`` is recomputed here.  If the layer JSON already exists,
+the new GT result is merged into it so previously computed
+``linear_shared_mean`` and ``spherical_shared_mean`` values are preserved.
 """
 
 from __future__ import annotations
@@ -49,26 +52,23 @@ from method.dyn3d_sga.eval_utils import (  # noqa: E402
     resolve_device,
     set_seed,
 )
-from method.spherical_steering.steering import get_spherical_intervention  # noqa: E402
 
 
-METHODS = (
-    "linear_pair_specific",
-    "linear_shared_mean",
-    "spherical_pair_specific",
-    "spherical_shared_mean",
-)
+METHOD = "gt_neg_to_pos"
+GT_ALPHA = 1.0
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Steering-vector ablation across layers")
+    p = argparse.ArgumentParser(
+        description="GT-only neg->pos pair-vector MC1 evaluation across layers"
+    )
     p.add_argument("model_name", nargs="?", default="llama3.1-8B-Instruct")
     p.add_argument(
         "--feature_template",
         required=True,
         help=(
             "Single base pair-feature path template containing {layer}, e.g. "
-            "features/model_layer{layer}_dyn3d_pairs.npz. Do not include {fold}."
+            "features/model_layer{layer}_dynSVD_pairs.npz. Do not include {fold}."
         ),
     )
     p.add_argument("--layers", nargs="+", type=int, default=None)
@@ -76,10 +76,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--num_folds", type=int, default=2)
     p.add_argument("--model_dir", default=None)
     p.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
-    p.add_argument("--linear_alpha", type=float, default=1.0)
-    p.add_argument("--spherical_kappa", type=float, default=20.0)
-    p.add_argument("--spherical_alpha", type=float, required=True)
-    p.add_argument("--spherical_beta", type=float, required=True)
     p.add_argument("--no_instruction", action="store_true")
     p.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
     p.add_argument(
@@ -96,8 +92,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--allow_missing", action="store_true")
     args = p.parse_args()
 
-    if args.linear_alpha == 0:
-        p.error("--linear_alpha must be nonzero")
     if args.num_folds < 2:
         p.error("--num_folds must be >= 2")
     if not args.folds or len(set(args.folds)) != len(args.folds):
@@ -106,7 +100,7 @@ def parse_args() -> argparse.Namespace:
         p.error("each --folds value must satisfy 0 <= fold < num_folds")
     if "{fold}" in args.feature_template:
         p.error(
-            "--feature_template must point to the single *_dyn3d_pairs.npz file; "
+            "--feature_template must point to the single *_dynSVD_pairs.npz file; "
             "remove the {fold} placeholder"
         )
     return args
@@ -144,35 +138,31 @@ def write_json(path: Path, payload: dict) -> None:
     os.replace(tmp, path)
 
 
-def normalize_vector(vector: np.ndarray, device: torch.device) -> torch.Tensor:
-    tensor = torch.as_tensor(vector, dtype=torch.float32, device=device).flatten()
-    norm = torch.linalg.norm(tensor)
-    if norm.item() == 0:
-        raise ValueError("Steering vector has zero norm")
-    return tensor / norm
-
-
-def make_hook(
-    kind: str,
-    vector: np.ndarray,
-    args: argparse.Namespace,
+def make_gt_neg_to_pos_hook(
+    z_neg_raw: np.ndarray,
+    z_pos_raw: np.ndarray,
     device: torch.device,
 ):
-    if kind == "linear":
-        return get_additive_intervention(
-            torch.as_tensor(vector, dtype=torch.float32, device=device),
-            args.linear_alpha,
+    """Return h <- h + (z_pos_raw - z_neg_raw), alpha=1.
+
+    The returned hook is the same additive intervention used by the regular
+    linear steering code.  ``calculate_scores_zeroshot`` later binds
+    ``start_idx`` so the edit begins at the final prompt token and therefore
+    affects the logits used to score every answer token.
+    """
+    z_neg = torch.as_tensor(z_neg_raw, dtype=torch.float32, device=device).flatten()
+    z_pos = torch.as_tensor(z_pos_raw, dtype=torch.float32, device=device).flatten()
+    if z_neg.shape != z_pos.shape:
+        raise ValueError(
+            "GT pair shape mismatch: "
+            f"z_neg_raw={tuple(z_neg.shape)}, z_pos_raw={tuple(z_pos.shape)}"
         )
 
-    mu_t = normalize_vector(vector, device)
-    mu_h = -mu_t
-    return get_spherical_intervention(
-        mu_t,
-        mu_h,
-        args.spherical_kappa,
-        args.spherical_alpha,
-        args.spherical_beta,
-    )
+    pair_vector = z_pos - z_neg
+    if pair_vector.numel() == 0:
+        raise ValueError("GT pair vector is empty")
+
+    return get_additive_intervention(pair_vector, GT_ALPHA)
 
 
 def score(
@@ -236,13 +226,13 @@ def evaluate_layer(
     tokenizer,
     device: torch.device,
 ) -> dict:
-    totals = {method: 0 for method in METHODS}
+    total_correct = 0
     count = 0
     layer_name = get_layer_name(args.model_name, layer)
 
     for data in fold_data:
         ids = data.train_questions.tolist()
-        if args.max_questions:
+        if args.max_questions is not None:
             ids = ids[: args.max_questions]
 
         mappings = {}
@@ -269,31 +259,56 @@ def evaluate_layer(
 
         for question_id in tqdm(
             ids,
-            desc=f"layer {layer} fold {data.fold_idx}",
+            desc=f"GT layer {layer} fold {data.fold_idx}",
             leave=False,
         ):
             positive_row, false_rows = mappings[question_id]
             question = str(hf_dataset[question_id]["question"])
             truth = data.choices[positive_row]
-            mean_vector = data.shared_mean
 
-            # Shared mean: use the same intervention for every choice.
-            for kind, name in (
-                ("linear", "linear_shared_mean"),
-                ("spherical", "spherical_shared_mean"),
-            ):
-                hook = make_hook(kind, mean_vector, args, device)
-                truth_score = score(
-                    model,
-                    tokenizer,
-                    question,
-                    truth,
-                    hook,
-                    layer_name,
-                    device,
-                    args,
-                )
-                false_scores = [
+            # The truthful MC1 candidate is always scored exactly as-is.
+            truth_score = score(
+                model,
+                tokenizer,
+                question,
+                truth,
+                None,
+                layer_name,
+                device,
+                args,
+            )
+
+            # Each false candidate gets its own oracle pair direction:
+            #     v_ij = z_pos_raw - z_neg_raw
+            # and the additive hook is active over the causal answer-scoring span.
+            false_scores = []
+            for row in false_rows:
+                key = (positive_row, row)
+                if (
+                    key not in data.raw_negative_states
+                    or key not in data.raw_positive_states
+                ):
+                    raise KeyError(
+                        "GT neg->pos evaluation requires z_neg_raw and z_pos_raw "
+                        f"for answer pair {key}. Re-extract the base pairs NPZ."
+                    )
+
+                z_neg = data.raw_negative_states[key]
+                z_pos = data.raw_positive_states[key]
+                hook = make_gt_neg_to_pos_hook(z_neg, z_pos, device)
+
+                # Optional consistency guard: vector_utils should store the same
+                # raw pair direction as z_pos_raw - z_neg_raw.
+                if key in data.vectors:
+                    raw_delta = np.asarray(z_pos, np.float32) - np.asarray(z_neg, np.float32)
+                    stored_delta = np.asarray(data.vectors[key], np.float32)
+                    if not np.allclose(raw_delta, stored_delta, rtol=1e-4, atol=1e-5):
+                        raise ValueError(
+                            f"Pair {key}: stored v_T does not match "
+                            "z_pos_raw - z_neg_raw"
+                        )
+
+                false_scores.append(
                     score(
                         model,
                         tokenizer,
@@ -304,43 +319,9 @@ def evaluate_layer(
                         device,
                         args,
                     )
-                    for row in false_rows
-                ]
-                totals[name] += int(truth_score > max(false_scores))
+                )
 
-            # Exact pair vector: for each false candidate, score both members
-            # of that pair with that pair's raw v_ij intervention.
-            for kind, name in (
-                ("linear", "linear_pair_specific"),
-                ("spherical", "spherical_pair_specific"),
-            ):
-                wins = []
-                for row in false_rows:
-                    vector = data.vectors[(positive_row, row)]
-                    hook = make_hook(kind, vector, args, device)
-                    truth_score = score(
-                        model,
-                        tokenizer,
-                        question,
-                        truth,
-                        hook,
-                        layer_name,
-                        device,
-                        args,
-                    )
-                    false_score = score(
-                        model,
-                        tokenizer,
-                        question,
-                        data.choices[row],
-                        hook,
-                        layer_name,
-                        device,
-                        args,
-                    )
-                    wins.append(truth_score > false_score)
-                totals[name] += int(all(wins))
-
+            total_correct += int(truth_score > max(false_scores))
             count += 1
 
     if count == 0:
@@ -354,16 +335,66 @@ def evaluate_layer(
         "num_questions": count,
         "fold_storage": "single_base_pairs_npz_in_memory_split",
         "parameters": {
-            "linear_alpha": args.linear_alpha,
-            "spherical_kappa": args.spherical_kappa,
-            "spherical_alpha": args.spherical_alpha,
-            "spherical_beta": args.spherical_beta,
+            "gt_alpha": GT_ALPHA,
         },
-        "MC1": {
-            method: float(totals[method] / count)
-            for method in METHODS
+        "definitions": {
+            METHOD: (
+                "For each false MC1 answer, apply the exact raw pair direction "
+                "v_ij = z_pos_raw - z_neg_raw as h <- h + v_ij (alpha=1) "
+                "from the final prompt token through the answer-scoring span at "
+                "the target decoder layer. The truthful answer is scored without "
+                "intervention."
+            ),
         },
+        "MC1": {METHOD: float(total_correct / count)},
     }
+
+
+def _check_merge_compatibility(existing: dict, fresh: dict, path: Path) -> None:
+    """Refuse to merge GT into an obviously incompatible old result file."""
+    for field in ("layer", "model_name", "folds", "num_folds", "num_questions"):
+        if field in existing and field in fresh and existing[field] != fresh[field]:
+            raise ValueError(
+                f"Refusing to merge GT result into {path}: field {field!r} "
+                f"differs (existing={existing[field]!r}, fresh={fresh[field]!r})."
+            )
+
+
+def merge_with_existing(path: Path, fresh: dict) -> dict:
+    """Preserve already-computed shared-mean results and replace only GT."""
+    if not path.is_file():
+        return fresh
+
+    existing = json.loads(path.read_text(encoding="utf-8"))
+    _check_merge_compatibility(existing, fresh, path)
+
+    merged = dict(existing)
+    # Refresh common metadata from this run while retaining unrelated old fields.
+    for field in (
+        "layer",
+        "model_name",
+        "folds",
+        "num_folds",
+        "num_questions",
+        "fold_storage",
+        "model_path",
+        "feature_path",
+    ):
+        if field in fresh:
+            merged[field] = fresh[field]
+
+    parameters = dict(existing.get("parameters", {}))
+    parameters.update(fresh.get("parameters", {}))
+    merged["parameters"] = parameters
+
+    definitions = dict(existing.get("definitions", {}))
+    definitions.update(fresh.get("definitions", {}))
+    merged["definitions"] = definitions
+
+    mc1 = dict(existing.get("MC1", {}))
+    mc1[METHOD] = fresh["MC1"][METHOD]
+    merged["MC1"] = mc1
+    return merged
 
 
 def main() -> None:
@@ -382,9 +413,9 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(
-        "Steering vector ablation | "
+        "GT neg->pos MC1 only | "
         f"model={model_path} | layers={layers} | folds={args.folds} | "
-        "folds=derived in memory from one pairs.npz per layer"
+        "truth=no intervention | false=h+(z_pos_raw-z_neg_raw)"
     )
 
     for layer in layers:
@@ -406,7 +437,7 @@ def main() -> None:
             for fold in args.folds
         ]
 
-        payload = evaluate_layer(
+        fresh = evaluate_layer(
             layer,
             args,
             fold_data,
@@ -415,13 +446,13 @@ def main() -> None:
             tokenizer,
             device,
         )
-        payload["model_path"] = model_path
-        payload["feature_path"] = str(feature_path)
-        output_path = (
-            output_dir / f"{args.model_name}_layer{layer}_mc1.json"
-        )
+        fresh["model_path"] = model_path
+        fresh["feature_path"] = str(feature_path)
+
+        output_path = output_dir / f"{args.model_name}_layer{layer}_mc1.json"
+        payload = merge_with_existing(output_path, fresh)
         write_json(output_path, payload)
-        print(f"layer {layer}: {payload['MC1']}")
+        print(f"layer {layer}: {METHOD}={payload['MC1'][METHOD]:.12f}")
 
 
 if __name__ == "__main__":

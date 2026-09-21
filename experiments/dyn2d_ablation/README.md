@@ -1,21 +1,15 @@
 # Dyn2D strength × SLERP ablation
 
-This experiment is fixed to **Llama, fold 0**, as requested.
+This experiment evaluates the Dyn2D steering grid on TruthfulQA for both supported models and both outer folds.
 
-Dyn2D is evaluated on the 6×6 grid:
+Default sweep:
 
-- Steering strength: `0.5 1.0 1.5 2.0 2.5 3.0`
+- models: `LLAMA QWEN`
+- folds: `0 1`
+- strength: `0.5 1.0 1.5 2.0 2.5 3.0`
 - SLERP coefficient: `0.0 0.2 0.4 0.6 0.8 1.0`
 
-For each cell:
-
-```text
-V = normalize(v_avg)
-R = normalize(v_hat - v_avg)
-D = SLERP(V, R, slerp_t)
-D_scaled = D * ||v_hat||_2
-h_new = h + strength * D_scaled
-```
+For every model, fold0 and fold1 are trained/evaluated independently. The final grid value is the arithmetic mean of the two fold metrics at the same `(strength, slerp_t)` coordinate. Llama and Qwen are aggregated separately.
 
 Run:
 
@@ -23,14 +17,20 @@ Run:
 bash experiments/dyn2d_ablation/run.sh
 ```
 
-The runner reuses an existing feature file when available, trains the direct MLP
-once for fold0, loads Llama/checkpoint once for the full 36-cell sweep, and
-writes:
+Useful overrides:
 
-- `dyn2d_ablation_mc1.csv`
-- `dyn2d_ablation_results.json`
-- `dyn2d_ablation_mc1_heatmap.png`
-- `dyn2d_ablation_mc1_heatmap.pdf`
+```bash
+GPU=0 MODELS="LLAMA QWEN" FOLDS="0 1" RUN_EXTRACT=auto RUN_TRAIN=auto \
+  bash experiments/dyn2d_ablation/run.sh
+```
 
-Set `RUN_EXTRACT=1` or `RUN_TRAIN=1` to force those stages; `auto` is the
-default for both.
+`LLAMA_GPU` and `QWEN_GPU` can override the global GPU separately. `LLAMA_FEATURE_PATH` and `QWEN_FEATURE_PATH` can override feature files separately.
+
+Outputs are written under `results/experiment/dyn2d_ablation/`:
+
+- `checkpoints/<model>/fold*/`: fold-specific Dyn2D MLP checkpoints
+- `raw/<model>/fold*/`: raw fold-specific 6×6 CSV/JSON results
+- `summaries/<model>_fold_mean.csv|json`: fold0/fold1 arithmetic means (MC1/MC2/MC3)
+- `figures/`: one MC1 heatmap per model, using fold means
+
+`REUSE_EXISTING=1` (default) resumes completed grid cells instead of recomputing them.

@@ -22,7 +22,8 @@ prepare_feature(){
 }
 train_dyn3d(){
   local feature_path="$1" checkpoint_path="$2" fold_idx="$3" val_fraction="$4" seed="$5"
-  run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dyn_mlp.py --feature_path "$feature_path" --positive_mode "$POSITIVE_MODE" --output_path "$checkpoint_path" --num_folds "$NUM_FOLDS" --fold_idx "$fold_idx" --val_fraction "$val_fraction" --mlp_hidden "$MLP_HIDDEN" --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" --learning_rate "$LEARNING_RATE" --device "$DEVICE" --seed "$seed"
+  local mlp_hidden="${6:-$MLP_HIDDEN}"
+  run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/train_dyn_mlp.py --feature_path "$feature_path" --positive_mode "$POSITIVE_MODE" --output_path "$checkpoint_path" --num_folds "$NUM_FOLDS" --fold_idx "$fold_idx" --val_fraction "$val_fraction" --mlp_hidden "$mlp_hidden" --epochs "$EPOCHS" --batch_size "$BATCH_SIZE" --learning_rate "$LEARNING_RATE" --device "$DEVICE" --seed "$seed"
   require_file "$checkpoint_path"
 }
 eval_dyn3d(){

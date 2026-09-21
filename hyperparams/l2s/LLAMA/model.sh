@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-MODEL="${LLAMA_MODEL:-llama3.1-8B-Instruct}"
-MODEL_DIR="${LLAMA_MODEL_DIR:-/mnt/nas-public-bing/pinxuanli11/Meta-Llama-3.1-8B-Instruct}"
-MODEL_LABEL="${LLAMA_MODEL_LABEL:-Llama 3.1 8B}"
-DEFAULT_LAYER="${LLAMA_LAYER:-14}"
-DEFAULT_FOLD_IDX="${LLAMA_FOLD_IDX:-1}"

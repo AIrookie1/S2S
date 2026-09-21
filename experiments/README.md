@@ -7,6 +7,8 @@ Dyn3D now uses a direct MLP vector predictor: `normalize(h_neg) -> v_i`, with
 Current experiment groups:
 
 - `margin_ablation`: varies the Dyn3D margin gate at evaluation time.
+- `mlp_hidden_ablation`: varies Dyn3D direct-MLP hidden width over 16..2048 for Llama/Qwen and averages fold0/fold1.
+- `dyn2d_ablation`: evaluates the Dyn2D strength × SLERP grid for Llama/Qwen and averages fold0/fold1 per grid cell.
 - `weight_kappa_ablation`: varies adaptive similarity-weight sharpness.
 - `val_fraction_ablation`: varies the within-fold fraction allocated to direct-MLP training; the complementary fraction estimates `v_avg`.
 - `steering_vector_ablation`: compares pair-specific/shared-mean and linear/spherical steering using raw pair vectors.

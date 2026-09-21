@@ -66,17 +66,24 @@ def main() -> int:
                 if not (base / "generic" / f"{ds}.sh").is_file():
                     errors.append(f"missing {base.relative_to(ROOT)}/generic/{ds}.sh")
 
-    # L2S is TruthfulQA-only for now, so it needs model/truthfulqa configs and
-    # the complete train/eval/judge launcher set but no generic-task tree.
-    for model in MODELS:
-        base = ROOT / "hyperparams" / "l2s" / model
-        for f in ("model.sh", "truthfulqa.sh"):
-            if not (base / f).is_file():
-                errors.append(f"missing {base.relative_to(ROOT)}/{f}")
-        script_base = ROOT / "script" / "l2s" / model
-        for f in ("run.sh", "run_train.sh", "run_eval.sh", "run_llm_judge.sh"):
-            if not (script_base / f).is_file():
-                errors.append(f"missing {script_base.relative_to(ROOT)}/{f}")
+    # The two L2S variants are TruthfulQA-only and must stay independently named.
+    for method in ("l2s_linear", "l2s_slerp"):
+        for model in MODELS:
+            base = ROOT / "hyperparams" / method / model
+            for f in ("model.sh", "truthfulqa.sh"):
+                if not (base / f).is_file():
+                    errors.append(f"missing {base.relative_to(ROOT)}/{f}")
+            script_base = ROOT / "script" / method / model
+            for f in ("run.sh", "run_train.sh", "run_eval.sh", "run_llm_judge.sh"):
+                if not (script_base / f).is_file():
+                    errors.append(f"missing {script_base.relative_to(ROOT)}/{f}")
+        method_base = ROOT / "method" / method
+        for f in ("model.py", "steering.py", "train_l2s.py", "evaluate_mc.py", "evaluate_llm_judge.py"):
+            if not (method_base / f).is_file():
+                errors.append(f"missing {method_base.relative_to(ROOT)}/{f}")
+    for legacy in (ROOT / "method" / "l2s", ROOT / "script" / "l2s", ROOT / "hyperparams" / "l2s"):
+        if legacy.exists():
+            errors.append(f"ambiguous legacy L2S directory remains: {legacy.relative_to(ROOT)}")
 
     # No generated result artifacts should live under experiments anymore.
     generated = {".png", ".pdf", ".svg", ".csv", ".json", ".jsonl"}
@@ -137,7 +144,7 @@ def main() -> int:
         print("Validation failed:")
         print("\n".join(f"- {e}" for e in errors))
         return 1
-    print("Validation OK: Python/shell syntax, direct-MLP Dyn3D core, experiment layout, hyperparameters, result hygiene, and method entrypoints all pass.")
+    print("Validation OK: Python/shell syntax, direct-MLP Dyn3D core, split L2S-LINEAR/L2S-SLERP layout, experiment layout, hyperparameters, result hygiene, and method entrypoints all pass.")
     return 0
 
 
