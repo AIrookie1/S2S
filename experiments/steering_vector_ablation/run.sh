@@ -30,7 +30,7 @@ SEED="$DYN_SEED"
 
 source "$REPO_ROOT/script/common.sh"
 
-GPU="${GPU:-0}"
+GPU="${GPU:-2}"
 NUM_FOLDS="${NUM_FOLDS:-2}"
 FOLDS="${FOLDS:-0 1}"
 LAYERS="${LAYERS:-$LAYERS_DEFAULT}"
@@ -52,7 +52,7 @@ esac
 
 BASE_FEATURE_TEMPLATE="${BASE_FEATURE_TEMPLATE:-}"
 if [[ -z "$BASE_FEATURE_TEMPLATE" ]]; then
-  BASE_FEATURE_TEMPLATE="$FEATURE_DIR/${MODEL}_layer{layer}_dynSVD_pairs.npz"
+  BASE_FEATURE_TEMPLATE="$FEATURE_DIR/${MODEL}_layer{layer}_dyn3d_pairs.npz"
 fi
 
 OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_ROOT/experiment/steering_vector_ablation}"
@@ -103,11 +103,11 @@ recover_broken_v2_feature_name() {
   [[ -f "$base" ]] && return 0
 
   # Compatibility with the earlier bash-template bug.  The old script printed:
-  #   <model>_layer{layer_dynSVD_pairs.npz}
+  #   <model>_layer{layer_dyn3d_pairs.npz}
   # Because that string does not actually end in ".npz", numpy may have written
   # an additional ".npz", producing:
-  #   <model>_layer{layer_dynSVD_pairs.npz}.npz
-  local broken_reported="$FEATURE_DIR/${MODEL}_layer{layer_dynSVD_pairs.npz}"
+  #   <model>_layer{layer_dyn3d_pairs.npz}.npz
+  local broken_reported="$FEATURE_DIR/${MODEL}_layer{layer_dyn3d_pairs.npz}"
   local broken_appended="${broken_reported}.npz"
   local broken=""
 
@@ -179,7 +179,7 @@ for layer in "${layer_args[@]}"; do
 
   if [[ ! -f "$base" ]]; then
     echo "Missing base feature: $base" >&2
-    echo "Use RUN_EXTRACT=auto/1 or provide the single *_dynSVD_pairs.npz file." >&2
+    echo "Use RUN_EXTRACT=auto/1 or provide the single *_dyn3d_pairs.npz file." >&2
     exit 1
   fi
 done

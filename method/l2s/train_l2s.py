@@ -39,17 +39,16 @@ def main() -> None:
         val_fraction=args.val_fraction,
         seed=args.seed,
     )
-    # Dyn3D fits its Router on router_q_indices.  L2S uses that exact
-    # same within-fold optimization subset, while retaining all split fields
-    # in the checkpoint for an auditable comparison.
-    optimization_q = split["router_q_indices"]
+    # Use the same within-fold optimization subset as Dyn3D's direct MLP so
+    # the comparison retains identical question-level splitting.
+    optimization_q = split["predictor_q_indices"]
     print(
         f"Selected fold {args.fold_idx}: outer-train={len(split['outer_train_q_indices'])} "
         f"held-out={len(split['test_q_indices'])}"
     )
     print(
         f"Within-fold split: mean-train={len(split['geometry_train_q_indices'])} "
-        f"router/L2S-train={len(optimization_q)} "
+        f"predictor/L2S-train={len(optimization_q)} "
         f"val_fraction={args.val_fraction:.3f}"
     )
 
@@ -92,10 +91,10 @@ def main() -> None:
         "geometry_train_q_indices": split["geometry_train_q_indices"],
         # Keep Dyn3D's checkpoint convention: train_q_indices denotes the
         # complete selected outer fold.  The actual L2S optimizer subset is
-        # recorded separately below, just as Dyn3D records router_q_indices.
+        # recorded separately below, just as Dyn3D records its MLP subset.
         "train_q_indices": split["outer_train_q_indices"],
         "val_q_indices": split["val_q_indices"],
-        "router_q_indices": split["router_q_indices"],
+        "predictor_q_indices": split["predictor_q_indices"],
         "l2s_train_q_indices": optimization_q,
         "test_q_indices": split["test_q_indices"],
     }

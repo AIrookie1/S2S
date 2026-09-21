@@ -34,7 +34,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument(
         "--entry-file",
-        default="evaluate_dynSVD.py",
+        default="evaluate_3d_dyn.py",
         help="要运行的 Python 文件名",
     )
 
@@ -58,7 +58,6 @@ def main() -> None:
         entry_file += ".py"
 
     aliases = {
-        "dynsvd": "dyn3d_sga",
         "3d-dyn": "dyn3d_sga",
         "dyn3d": "dyn3d_sga",
         "sga-2slerp": "dyn3d_sga",

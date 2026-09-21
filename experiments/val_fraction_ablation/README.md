@@ -1,5 +1,6 @@
-# val_fraction_ablation
+# Validation-fraction ablation
 
-Sweep validation fraction while keeping energy=0.99, Top-K=40, load-balance=0.02, kappa=8 and margin=-0.3 fixed.
-
-Run: `bash experiments/val_fraction_ablation/run.sh`
+Sweep the within-fold direct-MLP training fraction while keeping the direct
+predictor architecture, optimizer settings, adaptive-weight sharpness
+(`kappa`) and Dyn3D margin fixed.  The complementary question subset is used
+to estimate `v_avg`, preserving the main method's split protocol.

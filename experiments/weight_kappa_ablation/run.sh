@@ -3,7 +3,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 source "$REPO_ROOT/hyperparams/dyn3d_sga/experiments/weight_kappa_ablation.sh"
-GPU="${GPU:-1}"
+GPU="${GPU:-2}"
 source "$REPO_ROOT/experiments/common.sh"
 read -r -a MODEL_KEYS <<< "${MODELS:-LLAMA QWEN}"
 read -r -a FOLD_INDICES <<< "${FOLDS:-0 1}"
@@ -20,7 +20,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
     SUMMARY_JSON="$SUMMARY_DIR/${MODEL}_fold${FOLD_IDX}.json"; CHECKPOINT="$CHECKPOINT_DIR/${MODEL}_l${LAYER}_fold${FOLD_IDX}_baseline.npz"
     mkdir -p "$CHECKPOINT_DIR" "$DETAIL_DIR"; rm -f "$SUMMARY_JSON"
     echo "=== train once | model=$MODEL fold=$FOLD_IDX ==="
-    train_dyn3d "$FEATURE_PATH" "$CHECKPOINT" "$FOLD_IDX" "$VAL_FRACTION" "$SEED" "$ROUTER_TOP_K" "$LOAD_BALANCE_LOSS_WEIGHT"
+    train_dyn3d "$FEATURE_PATH" "$CHECKPOINT" "$FOLD_IDX" "$VAL_FRACTION" "$SEED"
     for KAPPA in "${WEIGHT_KAPPAS[@]}"; do
       TAG="$(safe_tag "$KAPPA")"; EVAL_JSON="$DETAIL_DIR/${MODEL}_l${LAYER}_fold${FOLD_IDX}_kappa${TAG}_eval.json"
       echo "=== kappa=$KAPPA | evaluate ==="

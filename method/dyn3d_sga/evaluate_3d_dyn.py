@@ -1,4 +1,4 @@
-"""Three-vector spherical dynSVD steering with token-level live statistics."""
+"""Three-vector spherical Dyn3D steering with a direct MLP vector predictor."""
 from __future__ import annotations
 
 import argparse
@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.dyn3d_sga.dynSVD import normalized_basis_combination
-from method.dyn3d_sga.evaluate_dynSVD import load_components
+from method.dyn3d_sga.dyn_mlp import predict_residual
+from method.dyn3d_sga.evaluate_dyn_mlp import load_components
 from method.dyn3d_sga.eval_utils import (
     HF_NAMES,
     calculate_scores_fewshot,
@@ -45,8 +45,8 @@ def adaptive_3way_weights(
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, dict]:
     """Return Similarity-Graph Adaptive 2-Slerp weights.
 
-    ``x`` and ``v`` are unit vectors. ``r`` is the L2-normalized routed
-    residual ``coeff @ basis``, matching the training objective.
+    ``x`` and ``v`` are unit vectors. ``r`` is the L2-normalized direct-MLP
+    residual ``v_hat - v_avg``.
     """
     if not np.isfinite(kappa) or kappa <= 0:
         raise ValueError("weight kappa must be finite and positive")
@@ -141,8 +141,7 @@ def validate_weights(alpha, beta, gamma):
 
 def get_3d_dynamic_intervention(
     avg,
-    basis,
-    router,
+    predictor,
     weight_kappa=8.0,
     margin=-0.3,
     eps=1e-8,
@@ -152,7 +151,7 @@ def get_3d_dynamic_intervention(
     """Build the 3d rotation hook with adaptive-weight margin gating.
 
     A token is steered only when one of the directional components (the
-    learned mean ``beta`` or router residual ``gamma``) exceeds the current
+    learned mean ``beta`` or predicted residual ``gamma``) exceeds the current
     hidden-state component ``alpha`` by ``margin``.  This keeps tokens whose
     alpha weight is already dominant unchanged.
     """
@@ -176,10 +175,13 @@ def get_3d_dynamic_intervention(
         )
         original = hidden[:, start:, :].float()
         original_norm = torch.linalg.vector_norm(original, dim=-1, keepdim=True).clamp_min(eps)
-        # Normalize both the Router input and routed residual, matching training.
+        # Preserve the original sequence-level Dyn3D behavior: normalize the
+        # current segment, predict one v_i from its last position, construct
+        # residual = normalize(v_hat_i - v_avg), then broadcast that same
+        # residual across the whole intervention segment.
         a = norm(original, eps)
-        coeff = router(a[:, -1, :])
-        residual = normalized_basis_combination(coeff, basis).float()
+        _, residual = predict_residual(predictor, a[:, -1, :], avg, eps=eps)
+        residual = residual.float()
         b = mean_direction.view(1, 1, -1).expand_as(a)
         c = residual.view(residual.shape[0], 1, -1).expand_as(a)
         alpha, beta, gamma, weight_info = adaptive_3way_weights(
@@ -273,9 +275,9 @@ def main():
 
     set_seed(args.seed)
     device = resolve_device(args.device)
-    data, avg, basis, router = load_components(args.checkpoint_path, device)
+    data, avg, predictor = load_components(args.checkpoint_path, device)
     print(
-        f"3d-dyn | dim={basis.shape[1]} rank={basis.shape[0]} "
+        f"3d-dyn | dim={avg.numel()} mlp_hidden={predictor.hidden_dim} "
         f"adaptive_kappa={args.weight_kappa} margin={args.margin}"
     )
     model_path = args.model_dir or HF_NAMES.get(args.model_name, args.model_name)
@@ -322,7 +324,7 @@ def main():
             (args.weights_bins, args.weights_bins), dtype=np.int64
         )
     hook = None if args.no_intervention else get_3d_dynamic_intervention(
-        avg, basis, router,
+        avg, predictor,
         weight_kappa=args.weight_kappa,
         margin=args.margin,
         eps=args.slerp_eps,

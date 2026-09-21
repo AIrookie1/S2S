@@ -1,12 +1,12 @@
 """
-Evaluate dynSVD steering with LLM Judge (Truth & Info Scores).
+Evaluate Dyn3D direct-MLP steering with LLM Judge (Truth & Info Scores).
 
 Generates model responses with/without steering, then evaluates using
 fine-tuned LLM judges for truthfulness and informativeness.
 
 Usage:
-    python evaluate_llm_judge_dynSVD.py llama3.1-8B-Instruct \
-        --checkpoint_path features/llama3.1-8B-Instruct_layer14_dynSVD_fold0_mean.npz \
+    python method/dyn3d_sga/evaluate_llm_judge.py llama3.1-8B-Instruct \
+        --checkpoint_path checkpoints/model_layer14_dynMLP_fold0_mean.npz \
         --layer 14 --alpha 1.0
 """
 
@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.dyn3d_sga.evaluate_dynSVD import load_components, get_dynamic_intervention
+from method.dyn3d_sga.evaluate_dyn_mlp import load_components, get_dynamic_intervention
 from method.dyn3d_sga.data import HF_NAMES
 
 # ==================== Constants ====================
@@ -160,7 +160,7 @@ def run_judge_phase(judge_path, questions, answers, info=False, desc="Judge"):
 # ==================== Main ====================
 
 def main():
-    parser = argparse.ArgumentParser(description='LLM Judge evaluation with dynSVD steering')
+    parser = argparse.ArgumentParser(description='LLM Judge evaluation with Dyn3D direct-MLP steering')
     parser.add_argument('model_name', type=str, help='Model name or HuggingFace path')
     parser.add_argument('--checkpoint_path', '--prototype_path', dest='checkpoint_path', type=str, required=True)
     parser.add_argument('--model_dir', type=str, default=None, help='Local model directory')
@@ -192,8 +192,8 @@ def main():
     model.generation_config.pad_token_id = tokenizer.pad_token_id
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    print(f"Loading dynSVD checkpoint: {args.checkpoint_path}")
-    ckpt, avg, basis, router = load_components(args.checkpoint_path, torch.device(device))
+    print(f"Loading Dyn3D direct-MLP checkpoint: {args.checkpoint_path}")
+    ckpt, avg, predictor = load_components(args.checkpoint_path, torch.device(device))
     test_q_indices = set(int(x) for x in np.asarray(ckpt['test_q_indices']).reshape(-1))
     fold_match = re.search(r'fold(\d+)', args.checkpoint_path)
     fold_idx = int(fold_match.group(1)) if fold_match else 0
@@ -208,7 +208,7 @@ def main():
     else:
         print(f"Steering: ON (alpha={args.alpha})")
         base_hook_fn = get_dynamic_intervention(
-            avg, basis, router, args.alpha,
+            avg, predictor, args.alpha,
             gamma=1.0, stats=steering_stats)
 
     # Load questions from HuggingFace dataset

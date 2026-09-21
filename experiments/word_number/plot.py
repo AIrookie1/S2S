@@ -123,14 +123,12 @@ def setup_plot_style():
 # Default configuration
 # ============================================================
 
-DEFAULT_JSON_PATH = Path(
-    "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/results/truthfulqa/dyn3d_sga/llama3.1-8B-Instruct/llm_judge/llama3.1-8B-Instruct_l14_fold1_llm_judge_3d.json"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_JSON_PATH = (
+    REPO_ROOT
+    / "results/truthfulqa/dyn3d_sga/llama3.1-8B-Instruct/llm_judge/llama3.1-8B-Instruct_l14_fold1_llm_judge_3d.json"
 )
-
-DEFAULT_OUT_DIR = Path(
-    "/root/pinxuanli/ICLR2026/Spherical-Steering-DynSVD/"
-    "results/experiment/word_number"
-)
+DEFAULT_OUT_DIR = REPO_ROOT / "results/experiment/word_number"
 
 TOPK = 5
 

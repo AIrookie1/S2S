@@ -14,5 +14,5 @@ interpolation are applied while preserving the hidden state's norm.
 
 The split metadata and launcher conventions match `method/dyn3d_sga`: the
 outer fold is selected first, then the selected fold is split deterministically
-by `val_fraction`; the L2S optimizer uses the same `router_q_indices` subset as
-Dyn3D's Router.
+by `val_fraction`; the L2S optimizer uses the same predictor-training subset as
+Dyn3D's direct MLP.

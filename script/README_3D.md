@@ -1,40 +1,50 @@
 # 3d-dyn adaptive 2-Slerp
 
-The migrated pipeline computes `(alpha, beta, gamma)` per token from `X`
-(normalized current hidden state), `V` (normalized learned mean), and `R`
-(the L2-normalized router residual `coeff @ basis`). `R` is normalized in both
-training and inference so the router learns residual direction. Pairwise similarity attention
-uses `WEIGHT_KAPPA`; the three adaptive weights are positive and sum to one.
+Dyn3D keeps the original three-direction spherical intervention, but its dynamic
+residual is now produced by a direct vector MLP instead of a basis router.
 
-```bash
-FOLD_IDX=0 WEIGHT_KAPPA=5.0 WEIGHT_TEMPERATURE=1.0 \
-  ./script/dyn3d_sga/LLAMA/run_3d_eval.sh
+For each training pair:
+
+```text
+v_i = h_pos - h_neg
+MLP(normalize(h_neg)) -> v_hat_i
+loss = MSE(v_hat_i, v_i)
 ```
 
-Model-specific launchers are organized under `LLAMA/` and `QWEN/`. Each
-folder contains the complete extract, train, evaluate, and end-to-end pipeline.
+`positive_mode=mean` preserves the original definition of `h_pos`: all positive
+answer activations for a question are averaged before forming `v_i`.
 
-The implementation normalizes only the hidden-state copy consumed by the
-Router and the mean direction. The Router residual stays as raw `coeff @ basis`
-through training and inference. During evaluation tqdm reports `TokenSteer: xx.x%`
-and the mean adaptive weights, followed by final token counts and mean weights.
+The selected outer fold is split at question level. The complementary
+`1-VAL_FRACTION` subset estimates `v_avg`, while `VAL_FRACTION` trains the MLP.
+Only negative hidden states are used as MLP inputs; positive states and
+interpolated auxiliary samples are not added.
 
-## Sparse Top-K residual-router training
+At inference time, the hidden-state copy consumed by the MLP is L2-normalized.
+One vector is predicted from the last hidden state of the current intervention
+segment:
 
-Router training uses sparse Top-K routing over the learned SVD basis. Only the
-selected K basis coefficients are kept, and they are renormalized to sum to
-one. The supervised target is `normalize((h_pos - h_neg) - v_avg)`, while the
-prediction is the unnormalized `coeff @ basis`. The optimization objective is
-`MSE(coeff @ basis, normalized_true_residual) + lambda * load_balance`. A
-Switch-style load-balancing auxiliary loss discourages basis collapse. The
-launchers expose Top-K and the load-balance weight as environment variables:
-
-```bash
-ROUTER_TOP_K=4 LOAD_BALANCE_LOSS_WEIGHT=0.01 \
-  ./script/dyn3d_sga/LLAMA/run_3d_train.sh
+```text
+v_hat_i = MLP(normalize(h_last))
+R = normalize(v_hat_i - v_avg)
 ```
 
-The effective Top-K and load-balance weight are stored in each dynSVD
-checkpoint, so evaluation automatically uses the same sparse routing behavior.
-Legacy checkpoints without `router_top_k` remain dense for backward
-compatibility.
+That single residual direction is broadcast across the segment, exactly
+preserving the previous sequence-level Dyn3D behavior. The three unit directions
+are then:
+
+- `X`: normalized current token hidden state,
+- `V`: normalized `v_avg`,
+- `R`: normalized predicted residual.
+
+The existing similarity-graph adaptive `(alpha, beta, gamma)` weighting,
+symmetric two-Slerp composition, hidden-norm restoration, and margin gating are
+unchanged.
+
+```bash
+FOLD_IDX=0 WEIGHT_KAPPA=5.0 \
+  ./script/dyn3d_sga/LLAMA/run_3d_dyn.sh
+```
+
+Training hyperparameters now expose `MLP_HIDDEN`, `EPOCHS`, `BATCH_SIZE`, and
+`LEARNING_RATE`. Basis rank/energy, sparse routing, Top-K, load balancing, and
+auxiliary interpolation settings are no longer part of Dyn3D.

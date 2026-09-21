@@ -1,9 +1,8 @@
-"""Extract paired representations in the format consumed by dynSVD.
+"""Extract raw answer-level hidden states and truthful/negative pairs for Dyn3D.
 
-Unlike the legacy feature builder, this program does not construct a bad
-subspace or an additive steering vector. It only extracts answer-level hidden
-states and writes truthful/hallucinated pairs for the dynSVD objective:
-    R * normalize(z_neg) ~= normalize(z_pos)
+The direct-MLP trainer consumes raw ``h_neg``/``h_pos`` pairs.  Training
+normalizes only the MLP input and learns the full vector
+``v_i = h_pos - h_neg`` directly.
 """
 from __future__ import annotations
 
@@ -60,7 +59,7 @@ def extract_last_token_activations(model, tokenizer, prompts, layer_idx: int, de
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Extract dynSVD paired hidden representations")
+    p = argparse.ArgumentParser(description="Extract Dyn3D paired hidden representations")
     p.add_argument("model_name")
     p.add_argument("--layer", type=int, default=14)
     p.add_argument("--save_dir", default="./features")
@@ -109,14 +108,13 @@ def main() -> None:
         z_pos, z_neg, v_t, v_h, positive_counts, negative_counts, pair_counts,
     ) = build_question_vectors(activations, data["labels"], data["q_indices"], data["choice_indices"])
     # Keep both raw and normalized pair states for compatibility. The current
-    # trainer uses the raw fields for geometry/residual/SVD and normalizes only
-    # the copies sent into Router.
+    # direct-MLP trainer uses the raw pair fields and normalizes h_neg itself.
     z_neg_raw, z_pos_raw = z_neg, z_pos
     z_neg = z_neg_raw / np.maximum(np.linalg.norm(z_neg_raw, axis=1, keepdims=True), 1e-12)
     z_pos = z_pos_raw / np.maximum(np.linalg.norm(z_pos_raw, axis=1, keepdims=True), 1e-12)
     os.makedirs(args.save_dir, exist_ok=True)
     safe = args.model_name.replace("/", "_").replace("\\", "_")
-    name = args.output_name or f"{safe}_layer{args.layer}_dynSVD_pairs.npz"
+    name = args.output_name or f"{safe}_layer{args.layer}_dyn3d_pairs.npz"
     path = os.path.join(args.save_dir, name)
     np.savez_compressed(
         path,
@@ -133,8 +131,8 @@ def main() -> None:
         layer=np.asarray(args.layer, dtype=np.int64), model_name=np.asarray(args.model_name),
         model_path=np.asarray(model_path), dataset_name=np.asarray("truthful_qa"),
         dataset_config=np.asarray("multiple_choice"), target_name=np.asarray("mc2_targets"),
-        method=np.asarray("dynSVD paired feature extraction"),
-        vector_definition=np.asarray("z_neg -> z_pos pairs; no additive vector or bad-subspace removal"),
+        method=np.asarray("Dyn3D paired feature extraction"),
+        vector_definition=np.asarray("v_i = z_pos_raw - z_neg_raw; direct MLP input is normalize(z_neg_raw)"),
     )
     print(f"Saved {path}")
 

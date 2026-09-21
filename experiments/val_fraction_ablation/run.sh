@@ -26,7 +26,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
         echo "=== val_fraction=$FRACTION seed=$RUN_SEED | reuse ==="
       else
         echo "=== val_fraction=$FRACTION seed=$RUN_SEED | train/eval ==="
-        train_dyn3d "$FEATURE_PATH" "$CHECKPOINT" "$FOLD_IDX" "$FRACTION" "$RUN_SEED" "$ROUTER_TOP_K" "$LOAD_BALANCE_LOSS_WEIGHT"
+        train_dyn3d "$FEATURE_PATH" "$CHECKPOINT" "$FOLD_IDX" "$FRACTION" "$RUN_SEED"
         eval_dyn3d "$CHECKPOINT" "$EVAL_JSON" "$WEIGHT_KAPPA" "$MARGIN" "$RUN_SEED"
       fi
       run_cmd "$PYTHON_BIN" "$HERE/collect.py" --val-fraction "$FRACTION" --seed "$RUN_SEED" --model "$MODEL" --model-label "$MODEL_LABEL" --layer "$LAYER" --fold "$FOLD_IDX" --num-folds "$NUM_FOLDS" --eval-json "$EVAL_JSON" --checkpoint "$CHECKPOINT" --output "$SUMMARY_JSON"

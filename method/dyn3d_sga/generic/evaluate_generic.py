@@ -28,8 +28,11 @@ from baukit import TraceDict
 
 # Keep the original dataset and scoring implementation; only the steering
 # hook is replaced by the project's Dyn3D method.
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from method.dyn3d_sga.evaluate_dynSVD import load_components
+PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', '..', '..')
+)
+sys.path.insert(0, PROJECT_ROOT)
+from method.dyn3d_sga.evaluate_dyn_mlp import load_components
 from method.dyn3d_sga.evaluate_3d_dyn import get_3d_dynamic_intervention
 from method.dyn3d_sga.generic.utils_generic import HF_NAMES, MMLU_CATEGORIES, set_seed
 from method.dyn3d_sga.generic.prompts_generic import (
@@ -313,7 +316,7 @@ def main():
 
     # Load the Dyn3D checkpoint trained on this dataset's original training split.
     print(f"Loading Dyn3D checkpoint: {args.checkpoint_path}")
-    _, avg, basis, router = load_components(
+    _, avg, predictor = load_components(
         args.checkpoint_path, torch.device(device)
     )
 
@@ -331,8 +334,7 @@ def main():
         )
         hook_fn = get_3d_dynamic_intervention(
             avg,
-            basis,
-            router,
+            predictor,
             weight_kappa=args.weight_kappa,
             margin=args.margin,
             stats=steering_stats,

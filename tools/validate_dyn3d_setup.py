@@ -7,8 +7,8 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ABLATIONS = {"load_balance_ablation", "margin_ablation", "router_topk_ablation", "val_fraction_ablation", "weight_kappa_ablation"}
-ANALYSES = {"steering_vector_ablation", "router_topk_position_analysis", "router_topk_frequency_analysis"}
+ABLATIONS = {"margin_ablation", "val_fraction_ablation", "weight_kappa_ablation"}
+ANALYSES = {"steering_vector_ablation"}
 GENERIC = {"boolq", "copa", "storycloze", "mmlu_global", "winogrande"}
 MODELS = {"LLAMA", "QWEN"}
 
@@ -108,6 +108,23 @@ def main() -> int:
                 if stale.search(text):
                     errors.append(f"stale layout reference in {p.relative_to(ROOT)}")
 
+    # Verify the direct-MLP Dyn3D core has fully replaced the old basis-routing core.
+    for f in ("dyn_mlp.py", "train_dyn_mlp.py", "evaluate_dyn_mlp.py", "evaluate_3d_dyn.py"):
+        if not (ROOT / "method" / "dyn3d_sga" / f).is_file():
+            errors.append(f"missing method/dyn3d_sga/{f}")
+    for obsolete in ("dynSVD.py", "train_dynSVD.py", "evaluate_dynSVD.py"):
+        if (ROOT / "method" / "dyn3d_sga" / obsolete).exists():
+            errors.append(f"obsolete Dyn3D file remains: method/dyn3d_sga/{obsolete}")
+    for obsolete_dir in (
+        "fig2",
+        "load_balance_ablation",
+        "router_topk_ablation",
+        "router_topk_position_analysis",
+        "router_topk_frequency_analysis",
+    ):
+        if (ROOT / "experiments" / obsolete_dir).exists():
+            errors.append(f"obsolete basis-routing experiment remains: experiments/{obsolete_dir}")
+
     # Verify Spherical-Steering core entrypoints and Dyn3D generic entrypoints exist.
     for f in ("steering.py", "get_activations.py", "get_prototypes.py", "evaluate_mc.py", "evaluate_llm_judge.py"):
         if not (ROOT / "method" / "spherical_steering" / f).is_file():
@@ -120,7 +137,7 @@ def main() -> int:
         print("Validation failed:")
         print("\n".join(f"- {e}" for e in errors))
         return 1
-    print("Validation OK: Python/shell syntax, single-pairs in-memory fold loading, restored experiment files, reorganized hyperparameters, result hygiene, and method entrypoints all pass.")
+    print("Validation OK: Python/shell syntax, direct-MLP Dyn3D core, experiment layout, hyperparameters, result hygiene, and method entrypoints all pass.")
     return 0
 
 

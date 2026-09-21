@@ -20,7 +20,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
     SUMMARY_JSON="$SUMMARY_DIR/${MODEL}_fold${FOLD_IDX}.json"; CHECKPOINT="$CHECKPOINT_DIR/${MODEL}_l${LAYER}_fold${FOLD_IDX}_baseline.npz"
     mkdir -p "$CHECKPOINT_DIR" "$DETAIL_DIR"; rm -f "$SUMMARY_JSON"
     echo "=== train once | model=$MODEL fold=$FOLD_IDX ==="
-    train_dyn3d "$FEATURE_PATH" "$CHECKPOINT" "$FOLD_IDX" "$VAL_FRACTION" "$SEED" "$ROUTER_TOP_K" "$LOAD_BALANCE_LOSS_WEIGHT"
+    train_dyn3d "$FEATURE_PATH" "$CHECKPOINT" "$FOLD_IDX" "$VAL_FRACTION" "$SEED"
     for RUN_MARGIN in "${MARGINS[@]}"; do
       TAG="$(safe_tag "$RUN_MARGIN")"; EVAL_JSON="$DETAIL_DIR/${MODEL}_l${LAYER}_fold${FOLD_IDX}_margin${TAG}_eval.json"
       echo "=== margin=$RUN_MARGIN | evaluate ==="

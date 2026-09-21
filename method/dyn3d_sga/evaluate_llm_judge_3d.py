@@ -11,20 +11,20 @@ Pass 2 (cacheable):
     Q + A0 -> one normal forward pass
     cache the target-layer hidden state of the LAST token (h_last)
 
-Router preparation (cheap, repeated for the current checkpoint):
+Predictor preparation (cheap, repeated for the current checkpoint):
     Feed cached h_last through the EXISTING get_3d_dynamic_intervention hook
-    once, capture the router output, and freeze that output for
+    once, capture the predictor output, and freeze that output for
     this question.
 
 Pass 3:
     Fresh Q-only generation.
     At every autoregressive step, apply the original 3D SLERP intervention
     to the CURRENT LAST TOKEN, exactly like the existing generation logic,
-    but with the router output fixed from Pass 2.
+    but with the predictor output fixed from Pass 2.
 
 The Pass-1 answer and Pass-2 last-token hidden state are saved in a .pt
 cache. On later runs they are reused automatically, so changing checkpoint,
-router or weight_kappa does not require rerunning Pass 1/2.
+predictor or weight_kappa does not require rerunning Pass 1/2.
 Pass 3 is rerun normally.
 
 The final JSON contains both unsteered and steered answers plus Truth/Info
@@ -54,7 +54,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.dyn3d_sga.evaluate_dynSVD import load_components
+from method.dyn3d_sga.evaluate_dyn_mlp import load_components
 from method.dyn3d_sga.evaluate_3d_dyn import get_3d_dynamic_intervention
 from method.dyn3d_sga.evaluate_llm_judge import format_generation_prompt
 
@@ -145,24 +145,24 @@ def _atomic_torch_save(obj, path):
 # ---------------------------------------------------------------------------
 
 @contextlib.contextmanager
-def fixed_dynamic_controls(router, controls):
-    """Force router to return the output computed from Pass-2 h_last."""
+def fixed_dynamic_controls(predictor, controls):
+    """Force predictor to return the output computed from Pass-2 h_last."""
     handles = []
 
     if controls is None:
         yield
         return
 
-    if controls.get("router") is not None:
-        if not hasattr(router, "register_forward_hook"):
-            raise TypeError("router is not an nn.Module; cannot freeze its output safely.")
+    if controls.get("predictor") is not None:
+        if not hasattr(predictor, "register_forward_hook"):
+            raise TypeError("predictor is not an nn.Module; cannot freeze its output safely.")
 
-        fixed_router = controls["router"]
+        fixed_predictor = controls["predictor"]
 
-        def _override_router(_module, _inputs, live_output):
-            return _tree_like(fixed_router, live_output)
+        def _override_predictor(_module, _inputs, live_output):
+            return _tree_like(fixed_predictor, live_output)
 
-        handles.append(router.register_forward_hook(_override_router))
+        handles.append(predictor.register_forward_hook(_override_predictor))
 
     try:
         yield
@@ -180,7 +180,7 @@ def generate_answer(
     max_new_tokens,
     *,
     prompt_text=None,
-    router=None,
+    predictor=None,
     fixed_controls=None,
 ):
     """
@@ -215,7 +215,7 @@ def generate_answer(
             )
 
             controls_ctx = (
-                fixed_dynamic_controls(router, fixed_controls)
+                fixed_dynamic_controls(predictor, fixed_controls)
                 if edit is not None
                 else _NullContext()
             )
@@ -300,31 +300,31 @@ def capture_probe_last_hidden(
 
 
 # ---------------------------------------------------------------------------
-# Convert cached h_last -> fixed router output
+# Convert cached h_last -> fixed predictor output
 # ---------------------------------------------------------------------------
 
 def controls_from_cached_hidden(
     dynamic_hook,
-    router,
+    predictor,
     probe_last_hidden,
     layer_name,
 ):
-    """Derive and capture the fixed router output from one cached h_last."""
+    """Derive and capture the fixed predictor output from one cached h_last."""
     captures = {}
     handles = []
 
-    if not hasattr(router, "register_forward_hook"):
+    if not hasattr(predictor, "register_forward_hook"):
         raise TypeError(
-            "router must be an nn.Module for fixed-per-question routing."
+            "predictor must be an nn.Module for fixed-per-question prediction."
         )
 
-    def _capture_router(_module, _inputs, output):
-        captures["router"] = _tree_to_cpu(output)
+    def _capture_predictor(_module, _inputs, output):
+        captures["predictor"] = _tree_to_cpu(output)
 
-    handles.append(router.register_forward_hook(_capture_router))
+    handles.append(predictor.register_forward_hook(_capture_predictor))
 
     try:
-        component_device = next(router.parameters()).device
+        component_device = next(predictor.parameters()).device
     except (StopIteration, AttributeError):
         component_device = (
             torch.device("cuda")
@@ -353,17 +353,17 @@ def controls_from_cached_hidden(
         for handle in handles:
             handle.remove()
 
-    if "router" not in captures:
+    if "predictor" not in captures:
         details = " | ".join(f"{kind}: {err}" for kind, err in errors)
         raise RuntimeError(
-            "Could not obtain router output from cached h_last using the "
+            "Could not obtain predictor output from cached h_last using the "
             "existing get_3d_dynamic_intervention hook. "
             "This usually means evaluate_3d_dyn.py uses a different hook "
-            "signature or does not call router as an nn.Module. "
+            "signature or does not call predictor as an nn.Module. "
             f"Attempts: {details}"
         )
 
-    return {"router": captures["router"]}
+    return {"predictor": captures["predictor"]}
 
 
 
@@ -633,19 +633,19 @@ def main():
     if args.output_path is None:
         args.output_path = str(
             Path(args.output_dir)
-            / f"{args.model_name}_l{args.layer}_llm_judge_3d_fixed_router.json"
+            / f"{args.model_name}_l{args.layer}_llm_judge_3d_fixed_predictor.json"
         )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load checkpoint/router first. The checkpoint supplies the fold test IDs.
+    # Load checkpoint/predictor first. The checkpoint supplies the fold test IDs.
     print(f"Loading 3D checkpoint: {args.checkpoint_path}")
-    checkpoint, avg, basis, router = load_components(
+    checkpoint, avg, predictor = load_components(
         args.checkpoint_path,
         device,
     )
 
-    router.eval()
+    predictor.eval()
 
     test_ids = sorted(
         int(x)
@@ -775,30 +775,28 @@ def main():
         model.eval()
 
     dynamic_hook = None
-    routing_hook = None
+    prediction_hook = None
     steering_stats = {"total": 0, "steered": 0, "weight_count": 0}
     if not args.disable_steering:
-        # Keep the one-token routing probe out of the live token statistics.
+        # Keep the one-token prediction probe out of the live token statistics.
         # It uses a stats-free hook; only the generation hook contributes to
         # the reported steering ratio.
-        routing_hook = get_3d_dynamic_intervention(
+        prediction_hook = get_3d_dynamic_intervention(
             avg,
-            basis,
-            router,
+            predictor,
             weight_kappa=args.weight_kappa,
             margin=args.margin,
         )
         dynamic_hook = get_3d_dynamic_intervention(
             avg,
-            basis,
-            router,
+            predictor,
             weight_kappa=args.weight_kappa,
             margin=args.margin,
             stats=steering_stats,
         )
 
     # ---------------- Pass 3 ----------------
-    # Fresh Q-only generation with fixed per-question routing decision.
+    # Fresh Q-only generation with fixed per-question prediction decision.
     print(f"\n--- Pass 3: Fresh Q-only 3D-steered generation ({len(test_ids)}) ---")
 
     records = []
@@ -828,11 +826,11 @@ def main():
                 prompt_text=generation_prompt,
             )
         else:
-            # Cheap router computation from cached h_last.
+            # Cheap predictor computation from cached h_last.
             # No Q+A0 model forward is repeated here.
             fixed_controls = controls_from_cached_hidden(
-                routing_hook,
-                router,
+                prediction_hook,
+                predictor,
                 cached["probe_last_hidden"],
                 layer_name,
             )
@@ -845,7 +843,7 @@ def main():
                 layer_name=layer_name,
                 max_new_tokens=args.max_new_tokens,
                 prompt_text=generation_prompt,
-                router=router,
+                predictor=predictor,
                 fixed_controls=fixed_controls,
             )
 
@@ -920,7 +918,7 @@ def main():
 
     output = {
         "method": (
-            "3-pass fixed-router 3D SLERP: "
+            "3-pass fixed-predictor 3D SLERP: "
             "Q->A0; Q+A0->cached last hidden; "
             "fresh Q-only autoregressive steering"
         ),
@@ -934,7 +932,7 @@ def main():
             "margin": args.margin,
             "steering_enabled": not args.disable_steering,
             "max_new_tokens": args.max_new_tokens,
-            "router_decision": (
+            "predictor_decision": (
                 "once per question from cached Q+A0 target-layer last-token hidden"
             ),
             "generation_intervention": (

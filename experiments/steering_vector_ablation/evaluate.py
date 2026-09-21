@@ -6,7 +6,7 @@ Four conditions are evaluated on the same training-fold MC1 questions:
   3. spherical + exact answer-pair vector
   4. spherical + shared mean vector
 
-Each layer uses exactly one base ``*_dynSVD_pairs.npz`` file.  Fold 0/1
+Each layer uses exactly one base ``*_dyn3d_pairs.npz`` file.  Fold 0/1
 membership is reconstructed in memory from that file; no fold-specific feature
 NPZ files are required.
 
@@ -68,7 +68,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help=(
             "Single base pair-feature path template containing {layer}, e.g. "
-            "features/model_layer{layer}_dynSVD_pairs.npz. Do not include {fold}."
+            "features/model_layer{layer}_dyn3d_pairs.npz. Do not include {fold}."
         ),
     )
     p.add_argument("--layers", nargs="+", type=int, default=None)
@@ -106,7 +106,7 @@ def parse_args() -> argparse.Namespace:
         p.error("each --folds value must satisfy 0 <= fold < num_folds")
     if "{fold}" in args.feature_template:
         p.error(
-            "--feature_template must point to the single *_dynSVD_pairs.npz file; "
+            "--feature_template must point to the single *_dyn3d_pairs.npz file; "
             "remove the {fold} placeholder"
         )
     return args

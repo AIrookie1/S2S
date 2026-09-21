@@ -1,6 +1,6 @@
 """Pair-level vector loading for the steering-vector ablation.
 
-The experiment keeps one base ``*_dynSVD_pairs.npz`` file per layer.  Fold
+The experiment keeps one base ``*_dyn3d_pairs.npz`` file per layer.  Fold
 membership is reconstructed in memory from ``q_indices`` using the same
 deterministic ``np.array_split`` rule that was previously used to materialize
 ``*_fold0.npz`` / ``*_fold1.npz`` copies.
@@ -78,7 +78,7 @@ def load_pair_vector_data(
 
     Preferred mode
     --------------
-    Pass ``fold_idx`` and read the single base ``*_dynSVD_pairs.npz`` file.
+    Pass ``fold_idx`` and read the single base ``*_dyn3d_pairs.npz`` file.
     Training-question membership is reconstructed in memory, so no fold-specific
     NPZ files are created or required.
 

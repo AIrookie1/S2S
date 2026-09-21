@@ -1,12 +1,18 @@
-# Dyn3D ablation experiments
+# Dyn3D experiments
 
-All ablations source `hyperparams/base.sh` through an experiment-specific config. The baseline is `energy=0.99`, `router_top_k=40`, `load_balance_loss_weight=0.02`, `weight_kappa=8`, and `margin=-0.3`. Each ablation changes only its named variable.
+Dyn3D now uses a direct MLP vector predictor: `normalize(h_neg) -> v_i`, with
+`v_i = h_pos - h_neg`. The dynamic residual used by 3D steering is
+`normalize(v_hat_i - v_avg)`. There is no SVD basis or routing stage.
 
-Directories:
-- `load_balance_ablation`: load-balancing weight = 0.01 ... 0.09.
-- `router_topk_ablation`: requested Top-K = 1, 5, 10, 20, 40, 80. The checkpoint and summary record both requested and effective Top-K if energy-selected rank clamps K.
-- `val_fraction_ablation`: validation-fraction sweep with multiple seeds.
-- `weight_kappa_ablation`: evaluation-only kappa sweep (includes baseline 8).
-- `margin_ablation`: evaluation-only margin sweep (includes baseline -0.3).
+Current experiment groups:
 
-Run `bash experiments/<name>/run.sh`. Add `DRY_RUN=1` to validate command construction without model/data execution. Add `RUN_EXTRACT=1` to generate missing TruthfulQA features using the shared extraction configuration.
+- `margin_ablation`: varies the Dyn3D margin gate at evaluation time.
+- `weight_kappa_ablation`: varies adaptive similarity-weight sharpness.
+- `val_fraction_ablation`: varies the within-fold fraction allocated to direct-MLP training; the complementary fraction estimates `v_avg`.
+- `steering_vector_ablation`: compares pair-specific/shared-mean and linear/spherical steering using raw pair vectors.
+- `truthfulqa`: TruthfulQA comparison utilities.
+- `word_number`: plotting/analysis utilities retained from the project.
+
+The obsolete basis-routing experiments were removed because the direct-vector
+Dyn3D model has no basis coefficients, sparse Top-K selection, or routing-load
+objective.

@@ -129,7 +129,7 @@ def split_like_dyn3d(
     val_fraction: float,
     seed: int,
 ) -> dict[str, np.ndarray]:
-    """Reproduce ``train_dynSVD.py`` question splitting exactly.
+    """Reproduce Dyn3D question splitting exactly.
 
     The current Dyn3D feature extractor has no precomputed fold fields, so the
     normal path uses sorted questions plus ``np.array_split``.  If a feature
@@ -176,7 +176,7 @@ def split_like_dyn3d(
         "outer_train_q_indices": selected_q,
         "geometry_train_q_indices": geometry_train_q,
         "val_q_indices": val_q,
-        "router_q_indices": val_q.copy(),
+        "predictor_q_indices": val_q.copy(),
         "test_q_indices": heldout_q,
     }
 

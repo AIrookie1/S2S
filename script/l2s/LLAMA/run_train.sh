@@ -8,7 +8,7 @@ source "$REPO_ROOT/script/common.sh"
 GPU="${GPU:-0}"
 FEATURE_PATH_WAS_SET=0
 if [[ -n "${FEATURE_PATH+x}" ]]; then FEATURE_PATH_WAS_SET=1; fi
-FEATURE_PATH="${FEATURE_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}_dynSVD_pairs.npz}"
+FEATURE_PATH="${FEATURE_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}.npz}"
 # Existing QWEN/Llama artifacts may use the old plain layer suffix.  Keep it
 # usable as a fallback; the Python loader reconstructs raw pairs from answer
 # activations when necessary.

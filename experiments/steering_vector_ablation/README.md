@@ -14,7 +14,7 @@ Every scored choice is intervened on, matching the uploaded Spherical MC scoring
 Each layer keeps only one base feature file:
 
 ```text
-features/<model>_layer<L>_dynSVD_pairs.npz
+features/<model>_layer<L>_dyn3d_pairs.npz
 ```
 
 There are no `*_fold0.npz` or `*_fold1.npz` copies. `vector_utils.py` reconstructs fold membership directly from the base file's `q_indices` with the same deterministic `np.array_split` rule previously used to create fold-specific files. Thus the fold definition is unchanged; only the redundant on-disk copies are removed.
@@ -23,7 +23,7 @@ For the default two-fold setup, selecting fold 0 means split 0 is held out and t
 
 ## Run
 
-If the requested `*_dynSVD_pairs.npz` files already exist:
+If the requested `*_dyn3d_pairs.npz` files already exist:
 
 ```bash
 bash experiments/steering_vector_ablation/run.sh
