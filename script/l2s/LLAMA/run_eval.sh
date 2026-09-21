@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$REPO_ROOT/hyperparams/l2s/LLAMA/truthfulqa.sh"
 source "$REPO_ROOT/script/common.sh"
 
-GPU="${GPU:-0}"
+GPU="${GPU:-2}"
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-$CHECKPOINT_ROOT/l2s/truthfulqa/$MODEL/${MODEL}_layer${LAYER}_l2s_fold${FOLD_IDX}.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_ROOT/truthfulqa/l2s/$MODEL}"
 OUTPUT_PATH="${OUTPUT_PATH:-$OUTPUT_DIR/${MODEL}_l${LAYER}_fold${FOLD_IDX}_l2s_mc.json}"

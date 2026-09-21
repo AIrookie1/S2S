@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$REPO_ROOT/hyperparams/l2s/LLAMA/truthfulqa.sh"
 source "$REPO_ROOT/script/common.sh"
 
-GPU="${GPU:-0}"
+GPU="${GPU:-2}"
 FEATURE_PATH_WAS_SET=0
 if [[ -n "${FEATURE_PATH+x}" ]]; then FEATURE_PATH_WAS_SET=1; fi
 FEATURE_PATH="${FEATURE_PATH:-$FEATURE_DIR/${MODEL}_layer${LAYER}.npz}"

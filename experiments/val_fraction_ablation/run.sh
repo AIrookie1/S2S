@@ -3,7 +3,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 source "$REPO_ROOT/hyperparams/dyn3d_sga/experiments/val_fraction_ablation.sh"
-GPU="${GPU:-0}"
+GPU="${GPU:-2}"
 source "$REPO_ROOT/experiments/common.sh"
 REUSE_EXISTING="${REUSE_EXISTING:-1}"
 read -r -a MODEL_KEYS <<< "${MODELS:-LLAMA QWEN}"

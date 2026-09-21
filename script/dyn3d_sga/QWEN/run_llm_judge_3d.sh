@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$REPO_ROOT/hyperparams/dyn3d_sga/QWEN/truthfulqa.sh"
 source "$REPO_ROOT/script/common.sh"
 
-GPU="${GPU:-1}"
+GPU="${GPU:-2}"
 CHECKPOINT_PATH_EXPLICIT=0
 if [[ -n "${CHECKPOINT_PATH:-}" ]]; then
   CHECKPOINT_PATH_EXPLICIT=1

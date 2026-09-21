@@ -3,7 +3,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 source "$REPO_ROOT/hyperparams/dyn3d_sga/experiments/margin_ablation.sh"
-GPU="${GPU:-1}"
+GPU="${GPU:-0}"
 source "$REPO_ROOT/experiments/common.sh"
 read -r -a MODEL_KEYS <<< "${MODELS:-LLAMA QWEN}"
 read -r -a FOLD_INDICES <<< "${FOLDS:-0 1}"
