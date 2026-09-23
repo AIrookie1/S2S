@@ -14,7 +14,18 @@ Current experiment groups:
 - `steering_vector_ablation`: compares pair-specific/shared-mean and linear/spherical steering using raw pair vectors.
 - `truthfulqa`: TruthfulQA comparison utilities.
 - `word_number`: plotting/analysis utilities retained from the project.
+- `kappa_view`: token-level ternary density of Dyn3D adaptive weights for configurable kappa values and optional margin-gate filtering.
 
 The obsolete basis-routing experiments were removed because the direct-vector
 Dyn3D model has no basis coefficients, sparse Top-K selection, or routing-load
 objective.
+
+## Unified figure formatting
+
+Experiment plotting is now centralized in three files:
+
+- `plot_sizes.py`: four standard 1/2 × 1/4 width/height combinations plus special custom sizes.
+- `plot_theme.py`: font/tick/legend/marker/line/errorbar sizes, colors and save settings.
+- `plot_specs.py`: per-figure labels, visibility switches, legend/annotation positions and layouts.
+
+See `PLOTTING.md` for the editing guide.

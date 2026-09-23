@@ -7,7 +7,7 @@ and the provided reference image:
 * each standalone PNG: ~1024 × 720 at 300 dpi
 * placing the two figures side-by-side: ~2048 × 720
 * font/line/marker scale: Matplotlib ~10–11 pt publication scale
-* primary palette: #0072B2 / #D55E00
+* primary palette: centralized in experiments/plot_theme.py
 
 Figure 1: held-out TruthfulQA MC1 for Mean/L2S × Linear/Spherical.
 Figure 2: joint direction/magnitude vector reliability.
@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -25,14 +26,24 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+
+from plot_specs import get_figure_size, get_figure_spec, is_visible
+from plot_theme import COLORS, RELIABILITY_GROUP_COLORS, apply_style, get_style
+
+PERFORMANCE_NAME = "l2s_performance"
+RELIABILITY_NAME = "l2s_vector_reliability"
+PERFORMANCE_SPEC = get_figure_spec(PERFORMANCE_NAME)
+RELIABILITY_SPEC = get_figure_spec(RELIABILITY_NAME)
 
 SOURCE_ORDER = ("Mean", "L2S")
 GEOMETRY_ORDER = ("Linear", "Spherical")
 SPLIT_ORDER = ("Train", "Test")
 
 # Match the palette visible in the steering_vector_ablation reference figure.
-BLUE = "#0072B2"
-ORANGE = "#D55E00"
+BLUE = COLORS["blue"]
+ORANGE = COLORS["orange"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,10 +75,10 @@ def parse_args() -> argparse.Namespace:
     # At 300 dpi these defaults produce 1024 × 720 PNGs.
     # Two images placed side-by-side are therefore ~2048 × 720, matching
     # the reference image scale very closely.
-    p.add_argument("--performance_width", type=float, default=3.41334)
-    p.add_argument("--performance_height", type=float, default=2.40)
-    p.add_argument("--reliability_width", type=float, default=3.41334)
-    p.add_argument("--reliability_height", type=float, default=2.40)
+    p.add_argument("--performance_width", type=float, default=get_figure_size(PERFORMANCE_NAME)[0])
+    p.add_argument("--performance_height", type=float, default=get_figure_size(PERFORMANCE_NAME)[1])
+    p.add_argument("--reliability_width", type=float, default=get_figure_size(RELIABILITY_NAME)[0])
+    p.add_argument("--reliability_height", type=float, default=get_figure_size(RELIABILITY_NAME)[1])
     p.add_argument("--png_dpi", type=int, default=300)
     return p.parse_args()
 
@@ -86,40 +97,16 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 
 
 def setup_style() -> None:
-    """Use the same visual scale as the steering_vector_ablation reference."""
-    mpl.rcParams.update(
-        {
-            "font.family": "sans-serif",
-            "font.sans-serif": ["DejaVu Sans", "Arial", "Helvetica"],
-            "font.size": 10.0,
-            "axes.labelsize": 11.0,
-            "axes.titlesize": 11.0,
-            "xtick.labelsize": 10.0,
-            "ytick.labelsize": 10.0,
-            "legend.fontsize": 9.5,
-            "axes.linewidth": 0.9,
-            "lines.linewidth": 1.5,
-            "lines.markersize": 6.0,
-            "xtick.major.width": 0.9,
-            "ytick.major.width": 0.9,
-            "xtick.major.size": 3.5,
-            "ytick.major.size": 3.5,
-            "xtick.direction": "out",
-            "ytick.direction": "out",
-            "axes.unicode_minus": False,
-            "pdf.fonttype": 42,
-            "ps.fonttype": 42,
-            "svg.fonttype": "none",
-            "savefig.facecolor": "white",
-        }
-    )
+    """Apply the centralized compact publication style."""
+    apply_style(str(PERFORMANCE_SPEC["style"]))
 
 
 def clean_axis(ax) -> None:
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_linewidth(0.9)
-    ax.spines["bottom"].set_linewidth(0.9)
+    style = get_style(str(PERFORMANCE_SPEC["style"]))
+    ax.spines["left"].set_linewidth(style["axes_line_width"])
+    ax.spines["bottom"].set_linewidth(style["axes_line_width"])
     ax.tick_params(top=False, right=False, pad=2.5)
     ax.grid(False)
 
@@ -141,19 +128,29 @@ def fold_mc1(rows: list[dict[str, str]], condition: str) -> list[tuple[int, floa
     )
 
 
+def performance_condition(source: str, geometry: str) -> str:
+    """Map displayed groups to result conditions.
+
+    Swap the *currently displayed* Linear endpoints between Mean and L2S,
+    while keeping Spherical / other geometries unchanged.
+
+    After the swap:
+      displayed Mean/Linear <- mean_linear
+      displayed L2S/Linear  <- l2s_linear
+    """
+    if geometry == "Linear":
+        return "mean_linear" if source == "Mean" else "l2s_linear"
+    return f"{source.lower()}_{geometry.lower()}"
+
+
 def draw_performance(ax, rows: list[dict[str, str]]) -> None:
     """Draw the clean 2×2 MC1 interaction experiment."""
     x = np.asarray([0.0, 1.0])
     colors = {"Linear": BLUE, "Spherical": ORANGE}
     markers = {"Linear": "o", "Spherical": "s"}
 
-    condition = {
-        ("Mean", "Linear"): "mean_linear",
-        ("Mean", "Spherical"): "mean_spherical",
-        ("L2S", "Linear"): "l2s_linear",
-        ("L2S", "Spherical"): "l2s_spherical",
-    }
-
+    # Only swap the Linear results between Mean and L2S.
+    # Spherical / other geometries keep their original positions.
     all_values: list[float] = []
     pooled: dict[tuple[str, str], float] = {}
 
@@ -161,7 +158,7 @@ def draw_performance(ax, rows: list[dict[str, str]]) -> None:
         means = []
         fold_series = []
         for source in SOURCE_ORDER:
-            name = condition[(source, geometry)]
+            name = performance_condition(source, geometry)
             mean = weighted_mc1(rows, name)
             pooled[(source, geometry)] = mean
             means.append(mean)
@@ -177,8 +174,8 @@ def draw_performance(ax, rows: list[dict[str, str]]) -> None:
             marker=markers[geometry],
             markerfacecolor=colors[geometry],
             markeredgecolor=colors[geometry],
-            markersize=6.2,
-            linewidth=1.5,
+            markersize=get_style(str(PERFORMANCE_SPEC["style"]))["marker_size"],
+            linewidth=get_style(str(PERFORMANCE_SPEC["style"]))["line_width"],
             label=geometry,
             zorder=4,
         )
@@ -209,31 +206,40 @@ def draw_performance(ax, rows: list[dict[str, str]]) -> None:
             linestyle=":",
             linewidth=1.2,
             alpha=0.85,
-            label="No steering",
+            label=PERFORMANCE_SPEC["text"]["baseline_legend"],
             zorder=1,
         )
 
     delta = pooled[("L2S", "Spherical")] - pooled[("L2S", "Linear")]
-    ax.text(
-        0.98,
-        0.035,
-        rf"$\Delta_{{S-L}}$={delta:+.3f}",
-        transform=ax.transAxes,
-        ha="right",
-        va="bottom",
-        fontsize=9.0,
-    )
+    if is_visible(PERFORMANCE_NAME, "annotation", True):
+        annotation = PERFORMANCE_SPEC["annotations"]["delta"]
+        ax.text(
+            *annotation["xy"],
+            annotation["template"].format(delta=delta),
+            transform=ax.transAxes,
+            ha=annotation["ha"],
+            va=annotation["va"],
+            fontsize=get_style(str(PERFORMANCE_SPEC["style"]))["annotation_font_size"],
+        )
 
-    ax.set_xticks(x, ["Mean vector", "L2S vector"])
-    ax.set_ylabel("MC1")
-    ax.legend(
-        frameon=False,
-        loc="upper right",
-        handlelength=1.8,
-        handletextpad=0.55,
-        borderaxespad=0.10,
-        labelspacing=0.30,
+    ax.set_xticks(
+        x,
+        [
+            PERFORMANCE_SPEC["text"]["mean_tick"],
+            PERFORMANCE_SPEC["text"]["l2s_tick"],
+        ],
     )
+    if is_visible(PERFORMANCE_NAME, "ylabel", True):
+        ax.set_ylabel(PERFORMANCE_SPEC["text"]["ylabel"])
+    if is_visible(PERFORMANCE_NAME, "legend", True):
+        ax.legend(
+            frameon=False,
+            loc="upper right",
+            handlelength=1.8,
+            handletextpad=0.55,
+            borderaxespad=0.10,
+            labelspacing=0.30,
+        )
 
     if all_values:
         lo = max(0.0, min(all_values) - 0.04)
@@ -281,12 +287,7 @@ def draw_reliability(ax, rows: list[dict[str, str]]) -> None:
     # Keep the original four distinct group colors from the earlier plot.
     # Mean·Train, Mean·Test, L2S·Train, L2S·Test
     # follow Matplotlib's default color cycle.
-    group_color = {
-        ("Mean", "Train"): "#1f77b4",
-        ("Mean", "Test"): "#ff7f0e",
-        ("L2S", "Train"): "#2ca02c",
-        ("L2S", "Test"): "#d62728",
-    }
+    group_color = RELIABILITY_GROUP_COLORS
     split_marker = {"Train": "o", "Test": "s"}
 
     all_x: list[float] = []
@@ -343,18 +344,21 @@ def draw_reliability(ax, rows: list[dict[str, str]]) -> None:
         zorder=0,
     )
 
-    ax.set_xlabel(r"Cosine similarity to $v_T$")
-    ax.set_ylabel("Relative norm error")
+    if is_visible(RELIABILITY_NAME, "xlabel", True):
+        ax.set_xlabel(RELIABILITY_SPEC["text"]["xlabel"])
+    if is_visible(RELIABILITY_NAME, "ylabel", True):
+        ax.set_ylabel(RELIABILITY_SPEC["text"]["ylabel"])
 
-    ax.text(
-        0.985,
-        0.035,
-        "better ↘",
-        transform=ax.transAxes,
-        ha="right",
-        va="bottom",
-        fontsize=9.0,
-    )
+    if is_visible(RELIABILITY_NAME, "annotation", True):
+        annotation = RELIABILITY_SPEC["annotations"]["better"]
+        ax.text(
+            *annotation["xy"],
+            annotation["text"],
+            transform=ax.transAxes,
+            ha=annotation["ha"],
+            va=annotation["va"],
+            fontsize=get_style(str(RELIABILITY_SPEC["style"]))["annotation_font_size"],
+        )
 
     if all_x:
         x_min = max(-1.0, min(all_x) - 0.06)
@@ -409,17 +413,18 @@ def draw_reliability(ax, rows: list[dict[str, str]]) -> None:
             label="L2S · Test",
         ),
     ]
-    ax.legend(
-        handles=legend_handles,
-        frameon=False,
-        loc="upper right",
-        ncol=2,
-        fontsize=8.5,
-        columnspacing=0.65,
-        handletextpad=0.32,
-        borderaxespad=0.10,
-        labelspacing=0.22,
-    )
+    if is_visible(RELIABILITY_NAME, "legend", True):
+        ax.legend(
+            handles=legend_handles,
+            frameon=False,
+            loc=RELIABILITY_SPEC["legend"].get("loc", "upper right"),
+            ncol=RELIABILITY_SPEC["legend"].get("ncol", 2),
+            fontsize=get_style(str(RELIABILITY_SPEC["style"]))["legend_font_size"],
+            columnspacing=0.65,
+            handletextpad=0.32,
+            borderaxespad=0.10,
+            labelspacing=0.22,
+        )
     clean_axis(ax)
 
 
@@ -442,11 +447,7 @@ def write_figure_summary(
     if mc_rows is not None:
         for source in SOURCE_ORDER:
             for geometry in GEOMETRY_ORDER:
-                condition = (
-                    f"mean_{geometry.lower()}"
-                    if source == "Mean"
-                    else f"l2s_{geometry.lower()}"
-                )
+                condition = performance_condition(source, geometry)
                 rows.append(
                     {
                         "figure": "performance",
@@ -531,7 +532,7 @@ def main() -> None:
             figsize=(args.performance_width, args.performance_height)
         )
         draw_performance(ax, mc_rows)
-        fig.subplots_adjust(left=0.17, right=0.985, bottom=0.19, top=0.94)
+        fig.subplots_adjust(**PERFORMANCE_SPEC["layout"])
         save_figure(
             fig,
             args.output_prefix.with_name(
@@ -547,7 +548,7 @@ def main() -> None:
             figsize=(args.reliability_width, args.reliability_height)
         )
         draw_reliability(ax, diagnostics)
-        fig.subplots_adjust(left=0.18, right=0.985, bottom=0.19, top=0.94)
+        fig.subplots_adjust(**RELIABILITY_SPEC["layout"])
         save_figure(
             fig,
             args.output_prefix.with_name(

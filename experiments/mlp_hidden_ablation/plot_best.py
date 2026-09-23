@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
-from plot_common import finish, load_fold_series, plot_mean_sd, save, setup_plot, write_csv
+from plot_common import figure_size, finish, load_fold_series, plot_mean_sd, save, setup_plot, write_csv
 
 
 def main() -> None:
@@ -42,7 +42,7 @@ def main() -> None:
     # Make random error bars reproducible
     random.seed(42)
 
-    setup_plot()
+    setup_plot("mlp_hidden_ablation")
 
     series = load_fold_series(args.input_dir, "mlp_hidden", args.num_folds)
 
@@ -53,16 +53,21 @@ def main() -> None:
             for _ in item["x"]
         ]
 
-    figure, axis = plt.subplots(figsize=(5.4, 4.0))
+    figure, axis = plt.subplots(figsize=figure_size("mlp_hidden_ablation"))
 
-    plot_mean_sd(axis, series)
+    plot_mean_sd(axis, series, figure_name="mlp_hidden_ablation")
 
     axis.set_xscale("log", base=2)
 
     x_values = sorted({int(x) for item in series for x in item["x"]})
     axis.set_xticks(x_values, labels=[str(x) for x in x_values])
 
-    finish(axis, "MLP hidden size")
+    xticks = [16, 64, 256, 1024]
+    if xticks is not None:
+        axis.set_xticks(xticks)
+        axis.set_xticklabels([str(x) for x in xticks])
+
+    finish(axis, figure_name="mlp_hidden_ablation")
 
     figure.tight_layout()
 

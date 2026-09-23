@@ -147,6 +147,7 @@ def get_3d_dynamic_intervention(
     eps=1e-8,
     small_angle_threshold=1e-4,
     stats=None,
+    weight_histogram_gate="all",
 ):
     """Build the 3d rotation hook with adaptive-weight margin gating.
 
@@ -157,6 +158,11 @@ def get_3d_dynamic_intervention(
     """
     # if not np.isfinite(margin) or margin < 0:
     #     raise ValueError("margin must be finite and non-negative")
+    if weight_histogram_gate not in {"all", "steered"}:
+        raise ValueError(
+            "weight_histogram_gate must be 'all' or 'steered' "
+            f"(got {weight_histogram_gate!r})"
+        )
     mean_direction = norm(avg, eps)
 
     def hook(output, layer_name=None, start_idx=None):
@@ -212,25 +218,39 @@ def get_3d_dynamic_intervention(
             stats["beta_sum"] = stats.get("beta_sum", 0.0) + float(beta.sum().item())
             stats["gamma_sum"] = stats.get("gamma_sum", 0.0) + float(gamma.sum().item())
             stats["last_weight_mean"] = weight_info["weights"].mean(dim=tuple(range(weight_info["weights"].ndim - 1))).detach().cpu().tolist()
-            # Optional token-level ternary histogram.  Rows index beta bins
-            # and columns index gamma bins; alpha is implicit as 1-beta-gamma.
-            # Keeping only counts avoids writing millions of raw token triples
-            # while retaining the full density needed by Fig. 7.
+            # Optional token-level ternary histogram. Rows index beta bins and
+            # columns index gamma bins; alpha is implicit as 1-beta-gamma.
+            # The histogram can use every token or only tokens that pass the
+            # margin gate.  Main evaluation metrics above always keep their
+            # original all-token adaptive-weight mean for backward compatibility.
             if "weight_histogram" in stats:
                 bins = int(stats["weight_histogram_bins"])
                 flat = weight_info["weights"].detach().float().reshape(-1, 3)
-                beta_idx = torch.floor(flat[:, 1] * bins).long()
-                gamma_idx = torch.floor(flat[:, 2] * bins).long()
-                valid = (
-                    (beta_idx >= 0)
-                    & (gamma_idx >= 0)
-                    & (beta_idx < bins)
-                    & (gamma_idx < bins)
-                    & (beta_idx + gamma_idx < bins)
+                if weight_histogram_gate == "steered":
+                    selected = flat[should_steer.detach().reshape(-1)]
+                else:
+                    selected = flat
+
+                selected_count = int(selected.shape[0])
+                stats["histogram_weight_count"] = (
+                    stats.get("histogram_weight_count", 0) + selected_count
                 )
-                linear = beta_idx[valid] * bins + gamma_idx[valid]
-                counts = torch.bincount(linear, minlength=bins * bins)
-                stats["weight_histogram"] += counts.reshape(bins, bins).cpu().numpy()
+                if selected_count:
+                    stats["histogram_alpha_sum"] = stats.get("histogram_alpha_sum", 0.0) + float(selected[:, 0].sum().item())
+                    stats["histogram_beta_sum"] = stats.get("histogram_beta_sum", 0.0) + float(selected[:, 1].sum().item())
+                    stats["histogram_gamma_sum"] = stats.get("histogram_gamma_sum", 0.0) + float(selected[:, 2].sum().item())
+                    beta_idx = torch.floor(selected[:, 1] * bins).long()
+                    gamma_idx = torch.floor(selected[:, 2] * bins).long()
+                    valid = (
+                        (beta_idx >= 0)
+                        & (gamma_idx >= 0)
+                        & (beta_idx < bins)
+                        & (gamma_idx < bins)
+                        & (beta_idx + gamma_idx < bins)
+                    )
+                    linear = beta_idx[valid] * bins + gamma_idx[valid]
+                    counts = torch.bincount(linear, minlength=bins * bins)
+                    stats["weight_histogram"] += counts.reshape(bins, bins).cpu().numpy()
         return (edited,) + rest if rest is not None else edited
 
     return hook
@@ -267,6 +287,16 @@ def main():
         type=int,
         default=80,
         help="Number of beta/gamma bins per axis for --weights_output_path.",
+    )
+    parser.add_argument(
+        "--weights_gate_mode",
+        "--weights-gate-mode",
+        choices=["all", "steered"],
+        default="all",
+        help=(
+            "Tokens included in --weights_output_path: 'all' keeps every "
+            "adaptive-weight token; 'steered' keeps only tokens passing the margin gate."
+        ),
     )
     args = parser.parse_args()
 
@@ -323,6 +353,10 @@ def main():
         stats["weight_histogram"] = np.zeros(
             (args.weights_bins, args.weights_bins), dtype=np.int64
         )
+        stats["histogram_weight_count"] = 0
+        stats["histogram_alpha_sum"] = 0.0
+        stats["histogram_beta_sum"] = 0.0
+        stats["histogram_gamma_sum"] = 0.0
     hook = None if args.no_intervention else get_3d_dynamic_intervention(
         avg, predictor,
         weight_kappa=args.weight_kappa,
@@ -330,6 +364,7 @@ def main():
         eps=args.slerp_eps,
         small_angle_threshold=args.small_angle_threshold,
         stats=stats,
+        weight_histogram_gate=args.weights_gate_mode,
     )
     progress = tqdm(range(len(results)), desc=mode)
     for i in progress:
@@ -386,6 +421,12 @@ def main():
     if args.weights_output_path:
         weights_path = Path(args.weights_output_path)
         weights_path.parent.mkdir(parents=True, exist_ok=True)
+        histogram_count = int(stats.get("histogram_weight_count", 0))
+        if histogram_count <= 0:
+            raise RuntimeError(
+                "No tokens were selected for the adaptive-weight histogram. "
+                f"weights_gate_mode={args.weights_gate_mode!r}, margin={args.margin}."
+            )
         weight_report = {
             "experiment": "fig7_adaptive_weight_density",
             "model_name": args.model_name,
@@ -394,13 +435,16 @@ def main():
             "eval_split": args.eval_split,
             "weight_kappa": float(args.weight_kappa),
             "margin": float(args.margin),
+            "weights_gate_mode": args.weights_gate_mode,
             "bins": int(args.weights_bins),
             "coordinates": {"row": "beta", "column": "gamma", "alpha": "1-beta-gamma"},
-            "token_count": int(stats["weight_count"]),
+            "token_count": histogram_count,
+            "all_weight_token_count": int(stats["weight_count"]),
+            "steered_token_count": int(stats["steered"]),
             "mean_adaptive_weights": {
-                "alpha": stats["alpha_sum"] / max(stats["weight_count"], 1),
-                "beta": stats["beta_sum"] / max(stats["weight_count"], 1),
-                "gamma": stats["gamma_sum"] / max(stats["weight_count"], 1),
+                "alpha": stats["histogram_alpha_sum"] / histogram_count,
+                "beta": stats["histogram_beta_sum"] / histogram_count,
+                "gamma": stats["histogram_gamma_sum"] / histogram_count,
             },
             "histogram": stats["weight_histogram"].tolist(),
         }
@@ -410,6 +454,8 @@ def main():
         )
         metrics["weight_histogram_path"] = str(weights_path)
         metrics["weight_histogram_bins"] = int(args.weights_bins)
+        metrics["weight_histogram_gate_mode"] = args.weights_gate_mode
+        metrics["weight_histogram_token_count"] = histogram_count
     report = {
         "method": "Similarity-Graph Adaptive 3D Spherical Steering",
         "model_name": args.model_name,

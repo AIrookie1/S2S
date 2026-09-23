@@ -5,6 +5,7 @@ import difflib
 import json
 import math
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -13,110 +14,78 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
-# If plot_common.py is in the same directory, reuse its common setup first.
-# The local settings below are then applied on top, so this file remains
-# fully controllable from one place.
-try:
-    from plot_common import setup_plot as setup_common_plot
-except ImportError:
-    setup_common_plot = None
+EXPERIMENTS_DIR = Path(__file__).resolve().parent.parent
+if str(EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(EXPERIMENTS_DIR))
 
+from plot_sizes import get_size
+from plot_specs import get_figure_spec
+from plot_theme import COLORS, SAVE_SETTINGS, apply_style, get_style
+
+FIGURE_NAME = "word_number"
+WORD_SPEC = get_figure_spec(FIGURE_NAME)
+WORD_OPTIONS = WORD_SPEC["word_number"]
+WORD_TEXT = WORD_SPEC["text"]
+WORD_STYLE = get_style(WORD_SPEC["style"])
 
 # ============================================================
 # Plot style configuration
-# Change figure appearance here only.
+# Central values come from plot_theme.py / plot_sizes.py / plot_specs.py.
 # ============================================================
-
-# ---- Font ----
 FONT_FAMILY = "DejaVu Sans"
-FONT_SIZE = 18.5
-AXES_TITLE_SIZE = 20
-AXES_LABEL_SIZE = 18
-XTICK_LABEL_SIZE = 17.4
-YTICK_LABEL_SIZE = 18
-LEGEND_FONT_SIZE = 18
-SUPTITLE_FONT_SIZE = 15.5
-META_TEXT_FONT_SIZE = 18
-SUMMARY_TEXT_FONT_SIZE = 17.8
-VALUE_LABEL_FONT_SIZE = 17
+FONT_SIZE = WORD_STYLE["font_size"]
+AXES_TITLE_SIZE = WORD_STYLE["axes_title_size"]
+AXES_LABEL_SIZE = WORD_STYLE["axes_label_size"]
+XTICK_LABEL_SIZE = WORD_STYLE["tick_label_size"]
+YTICK_LABEL_SIZE = WORD_STYLE["tick_label_size"]
+LEGEND_FONT_SIZE = WORD_STYLE["legend_font_size"]
+SUPTITLE_FONT_SIZE = WORD_OPTIONS["suptitle_font_size"]
+META_TEXT_FONT_SIZE = WORD_OPTIONS["meta_text_font_size"]
+SUMMARY_TEXT_FONT_SIZE = WORD_OPTIONS["summary_text_font_size"]
+VALUE_LABEL_FONT_SIZE = WORD_OPTIONS["value_label_font_size"]
 
-# ---- Figure size ----
-TWO_PANEL_FIGSIZE = (18, 6.9)
-SINGLE_PANEL_FIGSIZE = (9, 5.6)
+TWO_PANEL_FIGSIZE = get_size(WORD_OPTIONS["two_panel_size"])
+SINGLE_PANEL_FIGSIZE = get_size(WORD_OPTIONS["single_panel_size"])
 
-# ---- Colors ----
-DELETE_COLOR = "#C55A4A"
-ADD_COLOR = "#4778A8"
-CENTER_LINE_COLOR = "#333333"
-VALUE_TEXT_COLOR = "#444444"
-SECONDARY_TEXT_COLOR = "#555555"
+DELETE_COLOR = COLORS["delete"]
+ADD_COLOR = COLORS["add"]
+CENTER_LINE_COLOR = COLORS["black"]
+VALUE_TEXT_COLOR = COLORS["value_text"]
+SECONDARY_TEXT_COLOR = COLORS["secondary_text"]
 
-# ---- Line / spine / grid ----
-AXES_LINEWIDTH = 1.75
-CENTER_LINEWIDTH = 1.8
-STEM_LINEWIDTH = 2.0
-GRID_LINEWIDTH = 1.45
-GRID_ALPHA = 0.13
-TICK_WIDTH = 0.7
-TICK_LENGTH = 3
-
-# ---- Bar / marker ----
-BAR_HEIGHT = 0.46
-BAR_ALPHA = 0.82
-STEM_ALPHA = 0.95
-END_MARKER_SIZE = 18
-
-# ---- Layout ----
-XLIM_SCALE = 1.25
-VALUE_LABEL_PAD_RATIO = 0.025
-PANEL_TITLE_PAD = 8
-YTICK_PAD = 5
-TWO_PANEL_LEFT = 0.10
-TWO_PANEL_RIGHT = 0.985
-TWO_PANEL_BOTTOM = 0.10
-TWO_PANEL_TOP = 0.88
-TWO_PANEL_WSPACE = 0.26
-
-# ---- Figure-level text / legend positions ----
-SUPTITLE_X = 0.06
-SUPTITLE_Y = 0.985
-META_TEXT_X = 0.06
-META_TEXT_Y = 0.952
-SUMMARY_TEXT_Y = 0.018
-FIG_LEGEND_X = 0.985
-FIG_LEGEND_Y = 0.988
-SINGLE_LEGEND_Y = 1.02
-
-# ---- Saving ----
-SAVE_DPI = 600
-PDF_FONT_TYPE = 42
-PS_FONT_TYPE = 42
+AXES_LINEWIDTH = WORD_STYLE["axes_line_width"]
+CENTER_LINEWIDTH = WORD_OPTIONS["center_line_width"]
+STEM_LINEWIDTH = WORD_OPTIONS["stem_line_width"]
+GRID_LINEWIDTH = WORD_OPTIONS["grid_line_width"]
+GRID_ALPHA = WORD_OPTIONS["grid_alpha"]
+TICK_WIDTH = WORD_STYLE["tick_width"]
+TICK_LENGTH = WORD_STYLE["tick_length"]
+BAR_HEIGHT = WORD_OPTIONS["bar_height"]
+BAR_ALPHA = WORD_OPTIONS["bar_alpha"]
+STEM_ALPHA = WORD_OPTIONS["stem_alpha"]
+END_MARKER_SIZE = WORD_OPTIONS["end_marker_size"]
+XLIM_SCALE = WORD_OPTIONS["xlim_scale"]
+VALUE_LABEL_PAD_RATIO = WORD_OPTIONS["value_label_pad_ratio"]
+PANEL_TITLE_PAD = WORD_OPTIONS["panel_title_pad"]
+YTICK_PAD = WORD_OPTIONS["ytick_pad"]
+TWO_PANEL_LEFT = WORD_OPTIONS["two_panel_layout"]["left"]
+TWO_PANEL_RIGHT = WORD_OPTIONS["two_panel_layout"]["right"]
+TWO_PANEL_BOTTOM = WORD_OPTIONS["two_panel_layout"]["bottom"]
+TWO_PANEL_TOP = WORD_OPTIONS["two_panel_layout"]["top"]
+TWO_PANEL_WSPACE = WORD_OPTIONS["two_panel_layout"]["wspace"]
+SUPTITLE_X, SUPTITLE_Y = WORD_OPTIONS["suptitle_xy"]
+META_TEXT_X, META_TEXT_Y = WORD_OPTIONS["meta_text_xy"]
+SUMMARY_TEXT_Y = WORD_OPTIONS["summary_text_y"]
+FIG_LEGEND_X, FIG_LEGEND_Y = WORD_OPTIONS["figure_legend_xy"]
+SINGLE_LEGEND_Y = WORD_OPTIONS["single_legend_y"]
+SAVE_DPI = SAVE_SETTINGS["png_dpi"]
+PDF_FONT_TYPE = SAVE_SETTINGS["pdf_fonttype"]
+PS_FONT_TYPE = SAVE_SETTINGS["ps_fonttype"]
 
 
 def setup_plot_style():
-    """
-    Apply all plotting style settings.
-
-    If plot_common.setup_plot() is available, call it first.
-    Local settings in this file override plot_common where needed.
-    """
-    if setup_common_plot is not None:
-        setup_common_plot()
-
-    plt.rcParams.update({
-        "font.family": FONT_FAMILY,
-        "font.size": FONT_SIZE,
-        "axes.titlesize": AXES_TITLE_SIZE,
-        "axes.labelsize": AXES_LABEL_SIZE,
-        "xtick.labelsize": XTICK_LABEL_SIZE,
-        "ytick.labelsize": YTICK_LABEL_SIZE,
-        "legend.fontsize": LEGEND_FONT_SIZE,
-        "axes.linewidth": AXES_LINEWIDTH,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "pdf.fonttype": PDF_FONT_TYPE,
-        "ps.fonttype": PS_FONT_TYPE,
-    })
+    apply_style(WORD_SPEC["style"])
+    plt.rcParams.update({"font.family": FONT_FAMILY, "axes.spines.top": False, "axes.spines.right": False})
 
 
 # ============================================================
@@ -1372,7 +1341,7 @@ def draw_diverging_panel(
         height=BAR_HEIGHT,
         color=DELETE_COLOR,
         alpha=BAR_ALPHA,
-        label="Deleted from unsteered",
+        label=WORD_TEXT["deleted_legend"],
         zorder=2,
     )
 
@@ -1382,7 +1351,7 @@ def draw_diverging_panel(
         height=BAR_HEIGHT,
         color=ADD_COLOR,
         alpha=BAR_ALPHA,
-        label="Added in steered",
+        label=WORD_TEXT["added_legend"],
         zorder=2,
     )
 
@@ -1411,7 +1380,7 @@ def draw_diverging_panel(
         plot_df["deleted"].astype(int).tolist(),
         plot_df["added"].astype(int).tolist(),
     ):
-        if dv > 0:
+        if dv > 0 and WORD_TEXT.get("show_value_labels", True):
             ax.text(
                 -dv - pad,
                 yi,
@@ -1422,7 +1391,7 @@ def draw_diverging_panel(
                 color=VALUE_TEXT_COLOR,
             )
 
-        if av > 0:
+        if av > 0 and WORD_TEXT.get("show_value_labels", True):
             ax.text(
                 av + pad,
                 yi,
@@ -1445,7 +1414,10 @@ def draw_diverging_panel(
         FuncFormatter(lambda x, pos: f"{abs(int(x))}")
     )
 
-    ax.set_xlabel("Edit count   ← deleted     |     added →")
+    if WORD_TEXT.get("show_xlabel", True):
+        ax.set_xlabel(WORD_TEXT["xlabel"])
+    else:
+        ax.set_xlabel("")
 
     # panel_title = (
     #     f"{panel_letter}   {title}"
@@ -1453,12 +1425,9 @@ def draw_diverging_panel(
     #     else title
     # )
 
-    # ax.set_title(
-    #     panel_title,
-    #     loc="left",
-    #     fontweight="bold",
-    #     pad=PANEL_TITLE_PAD,
-    # )
+    if WORD_TEXT.get("show_panel_title", True):
+        panel_title = f"{panel_letter}   {title}" if panel_letter else title
+        ax.set_title(panel_title, loc="left", fontweight="bold", pad=PANEL_TITLE_PAD)
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -1518,26 +1487,27 @@ def plot_general_domain_two_panel(
     draw_diverging_panel(
         axes[0],
         general_df,
-        title="General words",
+        title=WORD_TEXT["general_panel_title"],
         panel_letter="a",
     )
 
     draw_diverging_panel(
         axes[1],
         domain_df,
-        title="Domain-specific words",
+        title=WORD_TEXT["domain_panel_title"],
         panel_letter="b",
     )
 
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(
-        handles,
-        labels,
-        frameon=False,
-        ncol=2,
-        loc="upper right",
-        bbox_to_anchor=(FIG_LEGEND_X, FIG_LEGEND_Y),
-    )
+    if WORD_TEXT.get("show_legend", True):
+        fig.legend(
+            handles,
+            labels,
+            frameon=False,
+            ncol=2,
+            loc="upper right",
+            bbox_to_anchor=(FIG_LEGEND_X, FIG_LEGEND_Y),
+        )
 
     filter_label = (
         "stopwords excluded from Top-K"
@@ -1545,43 +1515,41 @@ def plot_general_domain_two_panel(
         else "stopwords retained"
     )
 
-    fig.suptitle(
-        "Word-level lexical changes induced by steering",
-        x=SUPTITLE_X,
-        y=SUPTITLE_Y,
-        ha="left",
-        fontsize=SUPTITLE_FONT_SIZE,
-        fontweight="bold",
-    )
+    if WORD_TEXT.get("show_suptitle", True):
+        fig.suptitle(
+            WORD_TEXT["suptitle"],
+            x=SUPTITLE_X,
+            y=SUPTITLE_Y,
+            ha="left",
+            fontsize=SUPTITLE_FONT_SIZE,
+            fontweight="bold",
+        )
 
-    fig.text(
-        META_TEXT_X,
-        META_TEXT_Y,
-        f"Classification: {classifier_label}; {filter_label}",
-        ha="left",
-        va="top",
-        fontsize=META_TEXT_FONT_SIZE,
-        color=SECONDARY_TEXT_COLOR,
-    )
+    if WORD_TEXT.get("show_meta_text", True):
+        fig.text(
+            META_TEXT_X,
+            META_TEXT_Y,
+            WORD_TEXT["meta_template"].format(
+                classifier_label=classifier_label, filter_label=filter_label
+            ),
+            ha="left",
+            va="top",
+            fontsize=META_TEXT_FONT_SIZE,
+            color=SECONDARY_TEXT_COLOR,
+        )
 
-    summary_text = (
-        f"N = {summary['total_samples']}   |   "
-        f"changed = {summary['changed_samples']} "
-        f"({summary['changed_ratio']:.1%})   |   "
-        f"added tokens = {summary['total_added']:,}   |   "
-        f"deleted tokens = {summary['total_deleted']:,}   |   "
-        f"net = {summary['net_length_change']:+,}"
-    )
+    summary_text = WORD_TEXT["summary_template"].format(**summary)
 
-    fig.text(
-        0.5,
-        SUMMARY_TEXT_Y,
-        summary_text,
-        ha="center",
-        va="bottom",
-        fontsize=SUMMARY_TEXT_FONT_SIZE,
-        color=SECONDARY_TEXT_COLOR,
-    )
+    if WORD_TEXT.get("show_summary_text", True):
+        fig.text(
+            0.5,
+            SUMMARY_TEXT_Y,
+            summary_text,
+            ha="center",
+            va="bottom",
+            fontsize=SUMMARY_TEXT_FONT_SIZE,
+            color=SECONDARY_TEXT_COLOR,
+        )
 
     fig.subplots_adjust(
         left=TWO_PANEL_LEFT,
@@ -1628,14 +1596,15 @@ def save_single_panel(
     )
 
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(
-        handles,
-        labels,
-        frameon=False,
-        ncol=2,
-        loc="lower center",
-        bbox_to_anchor=(0.5, SINGLE_LEGEND_Y),
-    )
+    if WORD_TEXT.get("show_legend", True):
+        ax.legend(
+            handles,
+            labels,
+            frameon=False,
+            ncol=2,
+            loc="lower center",
+            bbox_to_anchor=(0.5, SINGLE_LEGEND_Y),
+        )
 
     plt.tight_layout()
 
@@ -1792,10 +1761,10 @@ def main():
     print(json_path.resolve())
     print("=" * 80)
 
-    if setup_common_plot is not None:
-        print("Plot style: plot_common.setup_plot() + local style overrides")
-    else:
-        print("Plot style: local style configuration only")
+    print(
+        "Plot style: centralized experiments/plot_theme.py + "
+        "experiments/plot_specs.py"
+    )
 
     (
         word_df,
@@ -2061,13 +2030,13 @@ def main():
 
     save_single_panel(
         panel_df=general_panel_df,
-        title="General words",
+        title=WORD_TEXT["general_panel_title"],
         output_path=out_dir / "general_diverging_single_panel.png",
     )
 
     save_single_panel(
         panel_df=domain_panel_df,
-        title="Domain-specific words",
+        title=WORD_TEXT["domain_panel_title"],
         output_path=out_dir / "domain_diverging_single_panel.png",
     )
 

@@ -17,6 +17,7 @@ sys.path.insert(0, str(HERE.parent))
 
 from plot_common import (  # noqa: E402
     EXPECTED_MODELS,
+    figure_size,
     finish,
     plot_mean_sd,
     save,
@@ -141,11 +142,11 @@ def main() -> None:
     args = parser.parse_args()
     seeds = [int(value) for value in args.seeds.split()]
 
-    setup_plot()
+    setup_plot("val_fraction_ablation")
     series = load_seed_series(args.input_dir, seeds)
-    figure, axis = plt.subplots(figsize=(5.0, 4.0))
-    plot_mean_sd(axis, series)
-    finish(axis, "Validation fraction")
+    figure, axis = plt.subplots(figsize=figure_size("val_fraction_ablation"))
+    plot_mean_sd(axis, series, figure_name="val_fraction_ablation")
+    finish(axis, figure_name="val_fraction_ablation")
     figure.tight_layout()
     save(figure, args.output_prefix)
     csv_path = write_csv(args.output_prefix, "val_fraction", series)
