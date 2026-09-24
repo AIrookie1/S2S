@@ -40,6 +40,8 @@ def main() -> None:
     parser.add_argument("--checkpoint_path", type=str, required=True)
     parser.add_argument("--strength", "--alpha", dest="strength", type=float, default=1.0)
     parser.add_argument("--slerp_t", "--slerp", dest="slerp_t", type=float, default=0.5)
+    parser.add_argument("--method", choices=["S2S_L", "S2S_L_Static"], default="S2S_L_Static")
+    parser.add_argument("--weight_kappa", type=float, default=3.0)
     parser.add_argument("--disable_steering", action="store_true")
     parser.add_argument("--model_dir", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
@@ -90,6 +92,8 @@ def main() -> None:
             predictor,
             strength=args.strength,
             slerp_t=args.slerp_t,
+            method=args.method,
+            weight_kappa=args.weight_kappa,
             stats=steering_stats,
         )
 

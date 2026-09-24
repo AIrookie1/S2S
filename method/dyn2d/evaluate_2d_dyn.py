@@ -65,6 +65,8 @@ def main() -> None:
         default=0.5,
         help="SLERP coefficient: 0 -> normalize(v_avg), 1 -> normalize(v_hat-v_avg).",
     )
+    parser.add_argument("--method", choices=["S2S_L", "S2S_L_Static"], default="S2S_L_Static")
+    parser.add_argument("--weight_kappa", type=float, default=3.0)
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--preset", default="qa")
     parser.add_argument("--no_instruction", action="store_true")
@@ -154,6 +156,8 @@ def main() -> None:
         slerp_t=args.slerp_t,
         eps=args.slerp_eps,
         small_angle_threshold=args.small_angle_threshold,
+        method=args.method,
+        weight_kappa=args.weight_kappa,
         stats=stats,
     )
 

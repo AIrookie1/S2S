@@ -293,6 +293,7 @@ def main():
     parser.add_argument('--weight_kappa', type=float, default=8.0)
     parser.add_argument('--margin', type=float, default=-0.3,
                         help='Only steer when max(beta, gamma) > alpha + margin')
+    parser.add_argument('--method', choices=['S2S_R', 'S2S_R_Static'], default='S2S_R')
     parser.add_argument('--disable_steering', action='store_true')
     parser.add_argument('--model_dir', type=str, default=None,
                         help="Local model directory (overrides model_name)")
@@ -337,6 +338,7 @@ def main():
             predictor,
             weight_kappa=args.weight_kappa,
             margin=args.margin,
+            method=args.method,
             stats=steering_stats,
         )
 

@@ -148,6 +148,8 @@ def get_3d_dynamic_intervention(
     small_angle_threshold=1e-4,
     stats=None,
     weight_histogram_gate="all",
+    method="S2S_R",
+    static_weights=(0.6, 0.3, 0.1),
 ):
     """Build the 3d rotation hook with adaptive-weight margin gating.
 
@@ -158,6 +160,10 @@ def get_3d_dynamic_intervention(
     """
     # if not np.isfinite(margin) or margin < 0:
     #     raise ValueError("margin must be finite and non-negative")
+    if method not in {"S2S_R", "S2S_R_Static"}:
+        raise ValueError(f"Unsupported 3D method: {method}")
+    if method == "S2S_R_Static":
+        validate_weights(*static_weights)
     if weight_histogram_gate not in {"all", "steered"}:
         raise ValueError(
             "weight_histogram_gate must be 'all' or 'steered' "
@@ -190,19 +196,24 @@ def get_3d_dynamic_intervention(
         residual = residual.float()
         b = mean_direction.view(1, 1, -1).expand_as(a)
         c = residual.view(residual.shape[0], 1, -1).expand_as(a)
-        alpha, beta, gamma, weight_info = adaptive_3way_weights(
-            a,
-            b,
-            c,
-            kappa=weight_kappa,
-            temperature=1.0,
-        )
+        if method == "S2S_R":
+            alpha, beta, gamma, weight_info = adaptive_3way_weights(
+                a, b, c, kappa=weight_kappa, temperature=1.0
+            )
+        else:
+            alpha = torch.full_like(a[..., :1], float(static_weights[0]))
+            beta = torch.full_like(a[..., :1], float(static_weights[1]))
+            gamma = torch.full_like(a[..., :1], float(static_weights[2]))
+            weight_info = {"weights": torch.cat([alpha, beta, gamma], dim=-1)}
 
         rotated_direction = two_slerp_sym(
             a, b, c, alpha, beta, gamma, eps, small_angle_threshold
         )
         candidate = rotated_direction * original_norm
-        should_steer = torch.maximum(beta, gamma) > (alpha + margin)
+        should_steer = (
+            torch.maximum(beta, gamma) > (alpha + margin)
+            if method == "S2S_R" else torch.ones_like(alpha, dtype=torch.bool)
+        )
         edited_segment = torch.where(should_steer, candidate, original)
         edited = hidden.clone()
         edited[:, start:, :] = edited_segment.to(hidden.dtype)
@@ -266,6 +277,7 @@ def main():
     parser.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
     parser.add_argument("--weight_kappa", "--adaptive_kappa", dest="weight_kappa", type=float, default=8.0, help="Similarity attention sharpness for adaptive weights")
     parser.add_argument("--margin", type=float, default=-0.3, help="Only steer when max(beta, gamma) > alpha + margin")
+    parser.add_argument("--method", choices=["S2S_R", "S2S_R_Static"], default="S2S_R")
     parser.add_argument("--few_shot", action="store_true")
     parser.add_argument("--preset", default="qa")
     parser.add_argument("--no_instruction", action="store_true")
@@ -365,6 +377,7 @@ def main():
         small_angle_threshold=args.small_angle_threshold,
         stats=stats,
         weight_histogram_gate=args.weights_gate_mode,
+        method=args.method,
     )
     progress = tqdm(range(len(results)), desc=mode)
     for i in progress:

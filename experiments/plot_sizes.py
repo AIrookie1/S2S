@@ -42,6 +42,7 @@ CUSTOM_FIGURE_SIZES: Final = {
     "kappa_view": (5.25, 4.95),
     "l2s_performance": (WIDTH_INCHES["1/4"]-1, HEIGHT_INCHES["1/4"]-1),
     "l2s_vector_reliability": (WIDTH_INCHES["1/4"], HEIGHT_INCHES["1/4"]-0.2),
+    "residual_analysis": (15.0, 4.6),
     "word_number_two_panel": (18.0, 6.9),
     "word_number_single_panel": (9.0, 5.6),
 }

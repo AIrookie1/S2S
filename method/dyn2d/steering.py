@@ -28,6 +28,7 @@ import torch
 import torch.nn.functional as F
 
 from method.dyn3d_sga.dyn_mlp import DirectVectorMLP, predict_residual
+from method.dyn3d_sga.evaluate_3d_dyn import adaptive_3way_weights
 
 
 def norm(x: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
@@ -118,6 +119,8 @@ def get_2d_dynamic_intervention(
     eps: float = 1e-8,
     small_angle_threshold: float = 1e-4,
     stats: dict | None = None,
+    method: str = "S2S_L_Static",
+    weight_kappa: float = 3.0,
 ):
     """Build the Dyn2D additive-steering hook.
 
@@ -125,6 +128,8 @@ def get_2d_dynamic_intervention(
     of the intervention segment. The resulting Dyn2D vector is broadcast to all
     positions in that segment, exactly as the existing Dyn3D residual is.
     """
+    if method not in {"S2S_L", "S2S_L_Static"}:
+        raise ValueError(f"Unsupported 2D method: {method}")
     if not np.isfinite(strength):
         raise ValueError("strength must be finite")
     if not np.isfinite(slerp_t) or not 0.0 <= slerp_t <= 1.0:
@@ -161,11 +166,19 @@ def get_2d_dynamic_intervention(
         residual = residual.float()
 
         mean_batch = mean_direction.view(1, -1).expand_as(residual)
+        if method == "S2S_L":
+            # Use the same adaptive similarity graph as S2S_R, then reduce the
+            # V/R weights to a 2-way spherical interpolation coefficient.
+            x_last = norm(original[:, -1, :], eps)
+            _, beta, gamma, _ = adaptive_3way_weights(
+                x_last, mean_batch, residual, kappa=weight_kappa, temperature=1.0
+            )
+            dynamic_t = gamma / (beta + gamma).clamp_min(eps)
+            t = dynamic_t
+        else:
+            t = slerp_t
         direction = slerp(
-            mean_batch,
-            residual,
-            slerp_t,
-            eps=eps,
+            mean_batch, residual, t, eps=eps,
             small_angle_threshold=small_angle_threshold,
         )
         predicted_norm = torch.linalg.vector_norm(v_hat, dim=-1, keepdim=True)

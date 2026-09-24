@@ -151,6 +151,18 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
         "legend": {"loc": "upper right", "ncol": 2},
         "layout": {"left": 0.18, "right": 0.985, "bottom": 0.19, "top": 0.94},
     },
+    "residual_analysis": {
+        "size": "residual_analysis",
+        "style": "compact",
+        "text": {
+            "panel_a_ylabel": "Cosine similarity to oracle residual",
+            "panel_b_ylabel": r"$\Delta$ MC1 over mean-only (pp)",
+            "panel_c_xlabel": "Residual-oracle alignment quintile",
+            "panel_c_ylabel": "Angular-error reduction vs. mean-only (deg)",
+        },
+        "show": {"title": False, "legend": False},
+        "layout": {"left": 0.055, "right": 0.995, "bottom": 0.22, "top": 0.93, "wspace": 0.36},
+    },
     "word_number": {
         "size": "word_number_two_panel",
         "style": "word_number",

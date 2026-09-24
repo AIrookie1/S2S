@@ -17,6 +17,7 @@ Current experiment groups:
 - `truthfulqa`: TruthfulQA comparison utilities.
 - `word_number`: plotting/analysis utilities retained from the project.
 - `kappa_view`: token-level ternary density of Dyn3D adaptive weights for configurable kappa values and optional margin-gate filtering.
+- `residual_analysis`: three-panel residual study runnable with either S2S-R or S2S-L-Static: oracle alignment/shuffle controls, method-faithful residual-swap MC intervention, method-family Mean-only baseline (cross-fitted Spherical Steering for S2S-R; linear additive v_avg for S2S-L-Static), and residual-quality versus angular gain.
 
 The obsolete basis-routing experiments were removed because the direct-vector
 Dyn3D model has no basis coefficients, sparse Top-K selection, or routing-load
