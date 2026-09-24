@@ -45,7 +45,7 @@ MMLU_CATEGORIES = {
         "computer_security", "conceptual_physics", "electrical_engineering",
         "elementary_mathematics", "high_school_biology", "high_school_chemistry",
         "high_school_computer_science", "high_school_mathematics", "high_school_physics",
-        "high_school_statistics", "machine_learning", "number_theory", "physics"
+        "high_school_statistics", "machine_learning"
     ],
     "Humanities": [
         "formal_logic", "high_school_european_history", "high_school_us_history",
@@ -177,7 +177,16 @@ def get_mmlu_global_data(split='train', seed=42, tokenizer=None):
         loaded = []
         for sub in subsets:
             try:
-                local_root=os.environ.get("MMLU_CACHE_DIR", "/root/.cache/huggingface/datasets/mmlu"); local_file=os.path.join(local_root, sub, "dev-00000-of-00001.parquet"); loaded.append(Dataset.from_parquet(local_file))
+                local_root = os.environ.get(
+                    "MMLU_CACHE_DIR", "/root/.cache/huggingface/datasets/mmlu"
+                )
+                # The 5-shot ``dev`` files only contain five rows per subject,
+                # so they cannot support the documented 500/500 category split.
+                # Use the full MMLU test corpus as the deterministic source pool.
+                local_file = os.path.join(
+                    local_root, sub, "test-00000-of-00001.parquet"
+                )
+                loaded.append(Dataset.from_parquet(local_file))
             except Exception as e:
                 print(f"  Warning: Failed to load {sub}: {e}")
         if not loaded:

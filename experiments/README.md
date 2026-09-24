@@ -12,6 +12,8 @@ Current experiment groups:
 - `weight_kappa_ablation`: varies adaptive similarity-weight sharpness.
 - `val_fraction_ablation`: varies the within-fold fraction allocated to direct-MLP training; the complementary fraction estimates `v_avg`.
 - `steering_vector_ablation`: compares pair-specific/shared-mean and linear/spherical steering using raw pair vectors.
+- `component_ablation`: paper Table 3, five-row S2S-R component ablation (MLP / S2S / adaptive weighting / margin gate), fold 0 only.
+- `generation_efficiency`: paper Table 4, one-GPU generation throughput with both generation-only and end-to-end timing for S2S-L/R.
 - `truthfulqa`: TruthfulQA comparison utilities.
 - `word_number`: plotting/analysis utilities retained from the project.
 - `kappa_view`: token-level ternary density of Dyn3D adaptive weights for configurable kappa values and optional margin-gate filtering.

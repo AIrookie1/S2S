@@ -7,6 +7,7 @@ Training prompts are built from the same dataset-specific templates used by
 ``evaluate_generic.py``.
 """
 
+import os
 import torch
 import numpy as np
 import random
@@ -44,7 +45,7 @@ MMLU_CATEGORIES = {
         "computer_security", "conceptual_physics", "electrical_engineering",
         "elementary_mathematics", "high_school_biology", "high_school_chemistry",
         "high_school_computer_science", "high_school_mathematics", "high_school_physics",
-        "high_school_statistics", "machine_learning", "number_theory", "physics"
+        "high_school_statistics", "machine_learning"
     ],
     "Humanities": [
         "formal_logic", "high_school_european_history", "high_school_us_history",
@@ -69,7 +70,7 @@ MMLU_CATEGORIES = {
 
 # ==================== Prompt Formatting ====================
 
-from prompts_generic import (
+from method.dyn3d_sga.generic.prompts_generic import (
     append_option,
     format_boolq_prompt,
     format_copa_prompt,
@@ -176,7 +177,16 @@ def get_mmlu_global_data(split='train', seed=42, tokenizer=None):
         loaded = []
         for sub in subsets:
             try:
-                local_root=os.environ.get("MMLU_CACHE_DIR", "/root/.cache/huggingface/datasets/mmlu"); local_file=os.path.join(local_root, sub, "dev-00000-of-00001.parquet"); loaded.append(Dataset.from_parquet(local_file))
+                local_root = os.environ.get(
+                    "MMLU_CACHE_DIR", "/root/.cache/huggingface/datasets/mmlu"
+                )
+                # ``dev`` has only five rows per subject.  Use the full test
+                # corpus as the deterministic source pool for the documented
+                # 500/500 per-category train/test split.
+                local_file = os.path.join(
+                    local_root, sub, "test-00000-of-00001.parquet"
+                )
+                loaded.append(Dataset.from_parquet(local_file))
             except Exception as e:
                 print(f"  Warning: Failed to load {sub}: {e}")
         if not loaded:
@@ -323,21 +333,28 @@ def get_dataset_data(
 def get_layer_activations(model, tokenizer, prompts, layer_idx, device):
     """
     Extract last-token activations from a specific layer using baukit.
-    Batch size = 1 for precision.
+    Prompts are processed in small padded batches.  For each row we select
+    the last non-padding token, which is equivalent to the original
+    single-prompt implementation but avoids thousands of separate forwards.
     """
     layer_name = f"model.layers.{layer_idx}"
     activations = []
+    batch_size = max(1, int(os.environ.get("EXTRACT_BATCH_SIZE", "8")))
 
     print(f"Extracting activations from {layer_name}...")
     model.eval()
 
     with torch.no_grad():
-        for prompt in tqdm(prompts, desc="Extracting"):
+        for start in tqdm(range(0, len(prompts), batch_size), desc="Extracting"):
+            batch_prompts = prompts[start : start + batch_size]
             # Evaluation tokenizes the base prompt and option without adding
             # another BOS token. Do the same here, especially for MMLU where
             # the chat template already contains its own special tokens.
             inputs = tokenizer(
-                prompt, return_tensors='pt', add_special_tokens=False
+                batch_prompts,
+                return_tensors='pt',
+                padding=True,
+                add_special_tokens=False,
             ).to(device)
 
             with TraceDict(model, [layer_name]) as ret:
@@ -347,7 +364,12 @@ def get_layer_activations(model, tokenizer, prompts, layer_idx, device):
             if isinstance(layer_output, tuple):
                 layer_output = layer_output[0]
 
-            last_token_act = layer_output[0, -1, :].cpu().numpy()
-            activations.append(last_token_act)
+            if isinstance(layer_output, tuple):
+                layer_output = layer_output[0]
+            mask = inputs["attention_mask"]
+            last_indices = mask.sum(dim=1).to(dtype=torch.long) - 1
+            row_indices = torch.arange(layer_output.shape[0], device=layer_output.device)
+            last_token_act = layer_output[row_indices, last_indices, :].cpu().numpy()
+            activations.extend(last_token_act)
 
     return np.array(activations)

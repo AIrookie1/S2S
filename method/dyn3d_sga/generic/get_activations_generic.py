@@ -16,10 +16,17 @@ Output:
 """
 
 import argparse
+import sys
 import torch
 import numpy as np
 import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
+
+# This file is normally launched by an absolute path from the shell wrapper.
+# Add the repository root so the ``method.*`` imports work in that mode too.
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from method.dyn3d_sga.generic.utils_generic import HF_NAMES, set_seed, get_dataset_data, get_layer_activations
 
@@ -65,6 +72,16 @@ def main():
         seed=args.seed, tokenizer=tokenizer
     )
 
+    if not prompts:
+        raise RuntimeError(
+            f"Dataset {args.dataset!r} split {args.split!r} returned no samples; "
+            "refusing to write an empty feature file"
+        )
+    if not (len(prompts) == len(labels) == len(q_indices)):
+        raise RuntimeError("prompts, labels, and q_indices must have equal lengths")
+    if set(np.unique(labels).tolist()) != {0, 1}:
+        raise RuntimeError("feature extraction requires both positive and negative labels")
+
     print(f"\n=== Data Statistics ===")
     print(f"Total samples: {len(prompts)}")
     print(f"Correct (label=1): {sum(labels)}, Incorrect (label=0): {len(labels) - sum(labels)}")
@@ -78,7 +95,9 @@ def main():
     save_name = f"{args.model_name}_{args.dataset}_{args.split}_l{args.layer}.npz"
     save_path = os.path.join(args.save_dir, save_name)
 
-    np.savez(save_path, activations=activations, labels=labels, q_indices=q_indices)
+    temp_path = save_path + ".tmp.npz"
+    np.savez(temp_path, activations=activations, labels=labels, q_indices=q_indices)
+    os.replace(temp_path, save_path)
     print(f"Saved to {save_path}")
 
 
