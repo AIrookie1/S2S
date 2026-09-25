@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot the three-panel residual-direction analysis figure."""
+"""Plot residual-direction analysis as three independent publication figures."""
 from __future__ import annotations
 
 import argparse
@@ -23,6 +23,7 @@ SPEC = get_figure_spec(FIGURE_NAME)
 CONDITION_ORDER = (
     "mean_only",
     "shuffled_residual",
+    "cross_category_cosine_nearest_residual",
     "predicted_residual",
     "oracle_residual",
 )
@@ -39,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         "--output_prefix",
         type=Path,
         default=None,
-        help="Default: <input_dir>/residual_analysis",
+        help="Base prefix. Outputs append _alignment, _swap, and _geometric_gain.",
     )
     p.add_argument(
         "--allow_missing_mc",
@@ -71,8 +72,18 @@ def clean_axis(ax) -> None:
 
 
 def draw_panel_a(ax, rows: list[dict[str, str]]) -> None:
-    columns = ("matched", "within_category_shuffled", "global_shuffled")
-    labels = ("Matched", "Category\nshuffled", "Global\nshuffled")
+    columns = (
+        "matched",
+        "within_category_shuffled",
+        "global_shuffled",
+        "cross_category_cosine_nearest",
+    )
+    labels = (
+        "Matched",
+        "Category\nshuffled",
+        "Global\nshuffled",
+        "Cross-category\ncosine-nearest",
+    )
     values = []
     for column in columns:
         arr = np.asarray([float(row[column]) for row in rows], dtype=float)
@@ -95,10 +106,10 @@ def draw_panel_a(ax, rows: list[dict[str, str]]) -> None:
         ax.scatter(
             np.full(len(arr), pos) + jitter,
             arr,
-            s=9,
+            s=18,
             alpha=0.18,
             linewidths=0,
-            zorder=2,
+            zorder=4,
         )
         if len(arr):
             q25, median, q75 = np.quantile(arr, [0.25, 0.5, 0.75])
@@ -108,9 +119,9 @@ def draw_panel_a(ax, rows: list[dict[str, str]]) -> None:
             ax.text(pos, 0.02, "n/a", ha="center", va="bottom", fontsize=8)
 
     ax.axhline(0.0, linestyle=":", linewidth=0.9, alpha=0.6)
-    ax.set_xticks(np.arange(1, 4), labels)
+    ax.set_xticks(np.arange(1, len(labels) + 1), labels)
     ax.set_ylabel(SPEC["text"]["panel_a_ylabel"])
-    ax.set_title("(a) Residual alignment", loc="left", fontweight="bold")
+    ax.set_title("Residual alignment", loc="left", fontweight="bold")
     clean_axis(ax)
 
 
@@ -127,7 +138,7 @@ def draw_panel_b(ax, rows: list[dict[str, str]] | None, *, mean_label: str, ylab
         )
         ax.set_xticks([])
         ax.set_ylabel(ylabel)
-        ax.set_title("(b) Residual swap", loc="left", fontweight="bold")
+        ax.set_title("Residual swap", loc="left", fontweight="bold")
         clean_axis(ax)
         return
 
@@ -144,7 +155,7 @@ def draw_panel_b(ax, rows: list[dict[str, str]] | None, *, mean_label: str, ylab
         y,
         yerr=yerr,
         fmt="o",
-        markersize=5.2,
+        markersize=10.2,
         linewidth=1.35,
         elinewidth=1.1,
         capsize=3.0,
@@ -152,10 +163,16 @@ def draw_panel_b(ax, rows: list[dict[str, str]] | None, *, mean_label: str, ylab
     )
     ax.set_xticks(
         x,
-        [mean_label, "Shuffled\nresidual", "Predicted\nresidual", "Oracle\nresidual"],
+        [
+            mean_label,
+            "Shuffled\nresidual",
+            "Cross-category\ncosine-nearest",
+            "Predicted\nresidual",
+            "Oracle\nresidual",
+        ],
     )
     ax.set_ylabel(ylabel)
-    ax.set_title("(b) Residual swap", loc="left", fontweight="bold")
+    ax.set_title("Residual swap", loc="left", fontweight="bold")
     clean_axis(ax)
 
 
@@ -182,7 +199,7 @@ def draw_panel_c(ax, rows: list[dict[str, str]], *, ylabel: str) -> None:
     ax.set_xticks(x, [f"Q{i}" for i in x])
     ax.set_xlabel(SPEC["text"]["panel_c_xlabel"])
     ax.set_ylabel(ylabel)
-    ax.set_title("(c) Residual quality vs. geometric gain", loc="left", fontweight="bold")
+    ax.set_title("Residual quality vs. geometric gain", loc="left", fontweight="bold")
     clean_axis(ax)
 
 
@@ -224,15 +241,20 @@ def main() -> None:
         panel_c_ylabel = SPEC["text"]["panel_c_ylabel"]
 
     apply_style(str(SPEC["style"]))
-    fig, axes = plt.subplots(1, 3, figsize=get_figure_size(FIGURE_NAME))
-    draw_panel_a(axes[0], alignment_rows)
-    draw_panel_b(axes[1], mc_rows, mean_label=mean_label, ylabel=panel_b_ylabel)
-    draw_panel_c(axes[2], quintile_rows, ylabel=panel_c_ylabel)
-
+    figure_size = get_figure_size(FIGURE_NAME)
     layout = SPEC.get("layout", {})
-    fig.subplots_adjust(**layout)
-    save(fig, output_prefix)
-    plt.close(fig)
+
+    figures = (
+        ("alignment", lambda ax: draw_panel_a(ax, alignment_rows)),
+        ("swap", lambda ax: draw_panel_b(ax, mc_rows, mean_label=mean_label, ylabel=panel_b_ylabel)),
+        ("geometric_gain", lambda ax: draw_panel_c(ax, quintile_rows, ylabel=panel_c_ylabel)),
+    )
+    for suffix, draw in figures:
+        fig, ax = plt.subplots(figsize=figure_size)
+        draw(ax)
+        fig.subplots_adjust(**layout)
+        save(fig, Path(f"{output_prefix}_{suffix}"))
+        plt.close(fig)
 
     if summary:
         print(
@@ -241,7 +263,7 @@ def main() -> None:
             f"model={summary.get('model_name')} layer={summary.get('layer')} "
             f"fold={summary.get('fold_idx')}"
         )
-    print(f"Saved {output_prefix}.png/.pdf")
+    print(f"Saved {output_prefix}_alignment/swap/geometric_gain.png/.pdf")
 
 
 if __name__ == "__main__":

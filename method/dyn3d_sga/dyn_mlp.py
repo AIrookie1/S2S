@@ -247,6 +247,8 @@ def fit_dynamic_mlp(
     learning_rate: float = 1e-3,
     device: str = "cpu",
     seed: int = 42,
+    target_noise_sigma: float = 0.0,
+    noise_seed: int | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, float]], dict[str, Any]]:
     """Fit the direct vector MLP while preserving Dyn3D's split semantics.
 
@@ -258,8 +260,13 @@ def fit_dynamic_mlp(
         loss = MSE(MLP(x), y)
 
     No positive-state samples or interpolated auxiliary samples are added.
+    When target noise is enabled, each MLP target is corrupted exactly once
+    before optimization; the same corrupted target is reused in every epoch
+    and batch. ``v_avg`` is always computed from the clean mean split.
     """
     set_seed(seed)
+    if not np.isfinite(target_noise_sigma) or target_noise_sigma < 0:
+        raise ValueError("target_noise_sigma must be finite and non-negative")
     if mlp_hidden <= 0 or epochs <= 0 or batch_size <= 0 or learning_rate <= 0:
         raise ValueError(
             "mlp_hidden, epochs, batch_size, and learning_rate must be positive"
@@ -294,7 +301,15 @@ def fit_dynamic_mlp(
     v_avg = vectors[mean_tr].mean(dim=0)
     raw_inputs = neg[mlp_tr]
     inputs = F.normalize(raw_inputs, p=2, dim=-1, eps=1e-8)
-    targets = vectors[mlp_tr]
+    clean_targets = vectors[mlp_tr]
+    targets = clean_targets
+    if target_noise_sigma > 0:
+        generator = torch.Generator(device=dev)
+        generator.manual_seed(int(seed if noise_seed is None else noise_seed))
+        noise = torch.randn(clean_targets.shape, generator=generator, device=dev, dtype=clean_targets.dtype)
+        noise = F.normalize(noise, p=2, dim=-1, eps=1e-12)
+        target_norm = torch.linalg.vector_norm(clean_targets, dim=-1, keepdim=True)
+        targets = clean_targets + float(target_noise_sigma) * target_norm * noise
 
     predictor = DirectVectorMLP(
         input_dim=neg.shape[-1],
@@ -320,6 +335,7 @@ def fit_dynamic_mlp(
         with torch.no_grad():
             prediction = predictor(inputs)
             train_mse = float(F.mse_loss(prediction, targets).cpu())
+            clean_train_mse = float(F.mse_loss(prediction, clean_targets).cpu())
             predicted_residual = F.normalize(
                 prediction - v_avg,
                 p=2,
@@ -343,12 +359,13 @@ def fit_dynamic_mlp(
             "epoch": float(epoch),
             "loss": float(np.mean(losses)),
             "train_vector_mse": train_mse,
+            "clean_train_vector_mse": clean_train_mse,
             "train_residual_cosine": residual_cosine,
         }
         history.append(record)
         print(
             f"epoch {epoch:03d} | loss={record['loss']:.6e} "
-            f"vector_mse={train_mse:.6e} residual_cos={residual_cosine:.6f}",
+            f"vector_mse={train_mse:.6e} clean_mse={clean_train_mse:.6e} residual_cos={residual_cosine:.6f}",
             flush=True,
         )
 
@@ -391,6 +408,9 @@ def fit_dynamic_mlp(
             ),
             "mean_train_pairs": int(mean_tr.sum().item()),
             "mlp_train_pairs": int(mlp_tr.sum().item()),
+            "target_noise_sigma": float(target_noise_sigma),
+            "noise_seed": int(seed if noise_seed is None else noise_seed),
+            "noisy_train_target_mse": float(F.mse_loss(targets, clean_targets).cpu()),
             "normalization_policy": (
                 "MLP input h_neg is L2-normalized; target v_i=h_pos-h_neg and "
                 "v_avg remain on the original hidden-state scale; inference "

@@ -64,6 +64,10 @@ def main() -> None:
     )
     parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--target_noise_sigma", type=float, default=0.0,
+                        help="Relative Gaussian noise sampled once per MLP target before training and then held fixed across epochs/batches.")
+    parser.add_argument("--noise_seed", type=int, default=None,
+                        help="Noise RNG seed; defaults to --seed.")
     args = parser.parse_args()
 
     h_neg, h_pos, q_indices, metadata = load_feature_pairs(
@@ -134,6 +138,8 @@ def main() -> None:
         learning_rate=args.learning_rate,
         device=args.device,
         seed=args.seed,
+        target_noise_sigma=args.target_noise_sigma,
+        noise_seed=args.noise_seed,
     )
 
     output = Path(args.output_path)
@@ -151,6 +157,10 @@ def main() -> None:
         "batch_size": np.asarray(args.batch_size, np.int64),
         "learning_rate": np.asarray(args.learning_rate, np.float32),
         "seed": np.asarray(args.seed, np.int64),
+        "target_noise_sigma": np.asarray(args.target_noise_sigma, np.float32),
+        "noise_seed": np.asarray(args.seed if args.noise_seed is None else args.noise_seed, np.int64),
+        "target_noise_definition": np.asarray("v_tilde = v + sigma * ||v||_2 * normalize(epsilon), epsilon ~ N(0,I); MLP supervision only"),
+        "target_noise_sampling": np.asarray("one draw per MLP target before optimization; fixed across all epochs and batches"),
         "v_avg": state["v_avg"].numpy().astype(np.float32),
         "history_json": np.asarray(json.dumps(history, ensure_ascii=False)),
         "metrics_json": np.asarray(json.dumps(metrics, ensure_ascii=False)),

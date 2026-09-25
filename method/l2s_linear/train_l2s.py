@@ -28,6 +28,10 @@ def main() -> None:
     parser.add_argument("--learning_rate", "--lr", dest="learning_rate", type=float, default=1e-3)
     parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--target_noise_sigma", type=float, default=0.0,
+                        help="Relative Gaussian noise sampled once per MLP target before training and then held fixed across epochs/batches.")
+    parser.add_argument("--noise_seed", type=int, default=None,
+                        help="Noise RNG seed; defaults to --seed.")
     args = parser.parse_args()
 
     z_neg, vectors, q_indices, metadata = load_l2s_pairs(args.feature_path)
@@ -42,6 +46,13 @@ def main() -> None:
     # Use the same within-fold optimization subset as Dyn3D's direct MLP so
     # the comparison retains identical question-level splitting.
     optimization_q = split["predictor_q_indices"]
+    mean_q = split["geometry_train_q_indices"]
+    mean_mask = np.isin(q_indices, mean_q)
+    if not mean_mask.any():
+        raise ValueError("L2S v_avg split is empty; cannot build a clean checkpoint")
+    # Keep the geometry-train baseline clean. Target corruption applies only
+    # to the MLP supervision subset and must not leak into v_avg.
+    v_avg = np.asarray(vectors[mean_mask].mean(axis=0), dtype=np.float32)
     print(
         f"Selected fold {args.fold_idx}: outer-train={len(split['outer_train_q_indices'])} "
         f"held-out={len(split['test_q_indices'])}"
@@ -63,6 +74,8 @@ def main() -> None:
         learning_rate=args.learning_rate,
         device=args.device,
         seed=args.seed,
+        target_noise_sigma=args.target_noise_sigma,
+        noise_seed=args.noise_seed,
     )
 
     output = Path(args.output_path)
@@ -76,6 +89,10 @@ def main() -> None:
         "batch_size": np.asarray(args.batch_size, dtype=np.int64),
         "learning_rate": np.asarray(args.learning_rate, dtype=np.float32),
         "seed": np.asarray(args.seed, dtype=np.int64),
+        "target_noise_sigma": np.asarray(args.target_noise_sigma, dtype=np.float32),
+        "noise_seed": np.asarray(args.seed if args.noise_seed is None else args.noise_seed, dtype=np.int64),
+        "target_noise_definition": np.asarray("v_tilde = v + sigma * ||v||_2 * normalize(epsilon), epsilon ~ N(0,I); MLP supervision only"),
+        "target_noise_sampling": np.asarray("one draw per MLP target before optimization; fixed across all epochs and batches"),
         "val_fraction": np.asarray(args.val_fraction, dtype=np.float32),
         "fold_idx": np.asarray(args.fold_idx, dtype=np.int64),
         "num_folds": np.asarray(args.num_folds, dtype=np.int64),
@@ -86,6 +103,7 @@ def main() -> None:
         ),
         "history_json": np.asarray(json.dumps(history, ensure_ascii=False)),
         "metrics_json": np.asarray(json.dumps(metrics, ensure_ascii=False)),
+        "v_avg": v_avg,
         # Keep the exact Dyn3D split names, plus an explicit L2S-LINEAR training name.
         "outer_train_q_indices": split["outer_train_q_indices"],
         "geometry_train_q_indices": split["geometry_train_q_indices"],

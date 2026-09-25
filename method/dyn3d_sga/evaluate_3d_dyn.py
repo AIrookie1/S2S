@@ -29,6 +29,7 @@ from method.dyn3d_sga.eval_utils import (
     set_seed,
     split_multi_answer,
 )
+from method.inference_residual_noise import make_noise_generator, perturb_unit_direction
 from truthfulqa.models import MC_calcs, set_columns
 
 
@@ -150,6 +151,8 @@ def get_3d_dynamic_intervention(
     weight_histogram_gate="all",
     method="S2S_R",
     static_weights=(0.6, 0.3, 0.1),
+    residual_noise_sigma=0.0,
+    residual_noise_seed=42,
 ):
     """Build the 3d rotation hook with adaptive-weight margin gating.
 
@@ -164,14 +167,18 @@ def get_3d_dynamic_intervention(
         raise ValueError(f"Unsupported 3D method: {method}")
     if method == "S2S_R_Static":
         validate_weights(*static_weights)
+    if not np.isfinite(residual_noise_sigma) or residual_noise_sigma < 0:
+        raise ValueError("residual_noise_sigma must be finite and non-negative")
     if weight_histogram_gate not in {"all", "steered"}:
         raise ValueError(
             "weight_histogram_gate must be 'all' or 'steered' "
             f"(got {weight_histogram_gate!r})"
         )
     mean_direction = norm(avg, eps)
+    noise_generator = None
 
     def hook(output, layer_name=None, start_idx=None):
+        nonlocal noise_generator
         del layer_name
         hidden, rest = (
             (output[0], output[1:]) if isinstance(output, tuple) else (output, None)
@@ -192,7 +199,16 @@ def get_3d_dynamic_intervention(
         # residual = normalize(v_hat_i - v_avg), then broadcast that same
         # residual across the whole intervention segment.
         a = norm(original, eps)
-        _, residual = predict_residual(predictor, a[:, -1, :], avg, eps=eps)
+        v_hat, residual = predict_residual(predictor, a[:, -1, :], avg, eps=eps)
+        if residual_noise_sigma > 0:
+            if noise_generator is None:
+                noise_generator = make_noise_generator(residual_noise_seed, v_hat.device)
+            residual = perturb_unit_direction(
+                v_hat - avg,
+                sigma=residual_noise_sigma,
+                generator=noise_generator,
+                eps=eps,
+            ).float()
         residual = residual.float()
         b = mean_direction.view(1, 1, -1).expand_as(a)
         c = residual.view(residual.shape[0], 1, -1).expand_as(a)
@@ -287,6 +303,14 @@ def main():
     parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="float16")
     parser.add_argument("--slerp_eps", type=float, default=1e-8)
     parser.add_argument("--small_angle_threshold", type=float, default=1e-4)
+    parser.add_argument(
+        "--residual_noise_sigma", type=float, default=0.0,
+        help="Inference-only relative Gaussian noise on the predicted residual direction.",
+    )
+    parser.add_argument(
+        "--residual_noise_seed", type=int, default=42,
+        help="Seed for inference-only residual noise.",
+    )
     parser.add_argument("--output_path", default=None)
     parser.add_argument("--save_details", action="store_true")
     parser.add_argument(
@@ -314,6 +338,8 @@ def main():
 
     if args.weights_bins < 8:
         parser.error("--weights_bins must be at least 8")
+    if not np.isfinite(args.residual_noise_sigma) or args.residual_noise_sigma < 0:
+        parser.error("--residual_noise_sigma must be finite and non-negative")
 
     set_seed(args.seed)
     device = resolve_device(args.device)
@@ -378,6 +404,8 @@ def main():
         stats=stats,
         weight_histogram_gate=args.weights_gate_mode,
         method=args.method,
+        residual_noise_sigma=args.residual_noise_sigma,
+        residual_noise_seed=args.residual_noise_seed,
     )
     progress = tqdm(range(len(results)), desc=mode)
     for i in progress:
@@ -480,6 +508,8 @@ def main():
             "margin": args.margin,
             "few_shot": bool(args.few_shot),
             "preset": args.preset,
+            "residual_noise_sigma": float(args.residual_noise_sigma),
+            "residual_noise_seed": int(args.residual_noise_seed),
         },
         "metrics": metrics,
         "results": json.loads(results.to_json(orient="records", force_ascii=False)),

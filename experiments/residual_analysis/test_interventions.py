@@ -69,6 +69,8 @@ from experiments.residual_analysis.evaluate import (  # noqa: E402
     SphericalPrototypeBank,
     _nearest_positive_target,
     compute_negative_geometry,
+    cross_category_cosine_nearest_indices,
+    _make_cross_category_cosine_nearest_map,
     get_dynamic_residual_intervention,
     get_static_2d_residual_intervention,
     load_spherical_prototype_bank,
@@ -404,3 +406,23 @@ def test_nearest_positive_target_uses_maximum_cosine() -> None:
     assert idx == 1
     assert np.allclose(target, positives[1])
     assert np.isclose(cosine, 1.0)
+
+
+def test_cross_category_cosine_nearest_indices_selects_best_other_category() -> None:
+    residuals = np.asarray([
+        [1.0, 0.0],
+        [0.9, 0.1],
+        [0.8, 0.2],
+        [-1.0, 0.0],
+    ], dtype=np.float32)
+    residuals /= np.linalg.norm(residuals, axis=1, keepdims=True)
+    categories = np.asarray(["A", "A", "B", "C"], dtype=object)
+    q = np.asarray([0, 1, 2, 3], dtype=np.int64)
+    donors, cos = cross_category_cosine_nearest_indices(residuals, categories, q)
+    # A rows must choose B row 2 (the closest allowed direction), not A row 1.
+    assert donors[0] == 2
+    assert donors[1] == 2
+    # B row 2 should choose A row 1, which is closer than A row 0.
+    assert donors[2] == 1
+    assert np.all(np.isfinite(cos))
+

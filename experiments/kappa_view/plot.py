@@ -13,10 +13,11 @@ from typing import Any
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.colors import Normalize
 from matplotlib.ticker import FuncFormatter
 
 formatter = FuncFormatter(lambda x, pos: f"{x:g}")
+
 
 # ---------------------------------------------------------------------
 # Project paths
@@ -35,7 +36,7 @@ if str(EXPERIMENTS_DIR) not in sys.path:
 
 from plot_common import figure_size, save_figure, setup_plot  # noqa: E402
 from plot_specs import get_figure_spec  # noqa: E402
-from plot_theme import COLORS, DENSITY_COLORS  # noqa: E402
+from plot_theme import COLORS  # noqa: E402
 
 FIGURE_NAME = "kappa_view"
 FIGURE_SPEC = get_figure_spec(FIGURE_NAME)
@@ -49,10 +50,12 @@ VERTEX_ALPHA = np.array(
     [0.5, math.sqrt(3.0) / 2.0],
     dtype=float,
 )
+
 VERTEX_BETA = np.array(
     [0.0, 0.0],
     dtype=float,
 )
+
 VERTEX_GAMMA = np.array(
     [1.0, 0.0],
     dtype=float,
@@ -363,12 +366,11 @@ def plot_one(
 
     fig, ax = plt.subplots(figsize=figure_size(FIGURE_NAME))
 
-    # Nature-style blue-red density palette.
-    cmap = LinearSegmentedColormap.from_list(
-        "nature_density",
-        list(DENSITY_COLORS),
-        N=256,
-    )
+    # Reference palette:
+    # low density: dark purple
+    # medium density: blue/green
+    # high density: yellow
+    cmap = plt.get_cmap("viridis")
 
     density_max = max(
         vmax,
@@ -464,7 +466,10 @@ def plot_one(
     )
     ax.set_xlim(*FIGURE_SPEC["ternary"]["xlim"])
     ylim_pad = FIGURE_SPEC["ternary"]["ylim_pad"]
-    ax.set_ylim(-ylim_pad, math.sqrt(3.0) / 2.0 + ylim_pad)
+    ax.set_ylim(
+        -ylim_pad,
+        math.sqrt(3.0) / 2.0 + ylim_pad
+    )
     ax.axis("off")
 
     fig.tight_layout(
@@ -527,11 +532,12 @@ def main() -> None:
     )
 
     # Only plot kappa = 1 and 10
-    target_kappas = {1.0, 10.0}
+    target_kappas = {1.0, 3.0, 5.0, 10.0, 20.0}
     records = [
         item for item in records
         if float(item["payload"]["weight_kappa"]) in target_kappas
     ]
+
     # One shared density scale across every kappa figure.
     vmax = max(
         float(
@@ -582,7 +588,8 @@ def main() -> None:
         "colorbar": False,
         "shared_density_scale": True,
         "weights_gate_modes": sorted({
-            str(item["payload"].get("weights_gate_mode", "all")) for item in records
+            str(item["payload"].get("weights_gate_mode", "all"))
+            for item in records
         }),
         "files": [
             {

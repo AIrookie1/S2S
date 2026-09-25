@@ -374,3 +374,32 @@ prototype/configuration is required.
 
 All figure labels are in English and use the repository's centralized plotting
 configuration.
+
+
+## Figure output
+
+`plot.py` now produces three independent Nature-style figures instead of a
+single three-panel canvas:
+
+- `residual_analysis_alignment.png/.pdf`
+- `residual_analysis_swap.png/.pdf`
+- `residual_analysis_geometric_gain.png/.pdf`
+
+All three use the shared project plotting theme, centralized size preset, and
+600-DPI/vector export settings.
+
+
+## Cross-category cosine-nearest control
+
+Panels 1 and 2 include an additional deterministic hard-shuffle control. For
+each recipient residual `r_i`, the donor is restricted to a different semantic
+category (and a different question) and selected by maximum cosine similarity:
+
+`j* = argmax_{j: category_j != category_i, q_j != q_i} cos(r_i, r_j)`.
+
+Panel 1 therefore reports four alignment conditions: Matched,
+Category-shuffled, Global-shuffled, and Cross-category cosine-nearest. Panel 2
+reports five intervention conditions: Mean only, Shuffled residual,
+Cross-category cosine-nearest residual, Predicted residual, and Oracle residual.
+The new control is deterministic; the existing random shuffle controls retain
+their multi-seed averaging.

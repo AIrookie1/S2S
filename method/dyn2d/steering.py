@@ -29,6 +29,7 @@ import torch.nn.functional as F
 
 from method.dyn3d_sga.dyn_mlp import DirectVectorMLP, predict_residual
 from method.dyn3d_sga.evaluate_3d_dyn import adaptive_3way_weights
+from method.inference_residual_noise import make_noise_generator, perturb_unit_direction
 
 
 def norm(x: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
@@ -121,6 +122,8 @@ def get_2d_dynamic_intervention(
     stats: dict | None = None,
     method: str = "S2S_L_Static",
     weight_kappa: float = 3.0,
+    residual_noise_sigma: float = 0.0,
+    residual_noise_seed: int = 42,
 ):
     """Build the Dyn2D additive-steering hook.
 
@@ -134,10 +137,14 @@ def get_2d_dynamic_intervention(
         raise ValueError("strength must be finite")
     if not np.isfinite(slerp_t) or not 0.0 <= slerp_t <= 1.0:
         raise ValueError("slerp_t must be finite and in [0, 1]")
+    if not np.isfinite(residual_noise_sigma) or residual_noise_sigma < 0:
+        raise ValueError("residual_noise_sigma must be finite and non-negative")
 
     mean_direction = norm(avg, eps)
+    noise_generator = None
 
     def hook(output, layer_name=None, start_idx=None):
+        nonlocal noise_generator
         del layer_name
         hidden, rest = (
             (output[0], output[1:]) if isinstance(output, tuple) else (output, None)
@@ -164,6 +171,15 @@ def get_2d_dynamic_intervention(
         )
         v_hat = v_hat.float()
         residual = residual.float()
+        if residual_noise_sigma > 0:
+            if noise_generator is None:
+                noise_generator = make_noise_generator(residual_noise_seed, v_hat.device)
+            residual = perturb_unit_direction(
+                v_hat - avg,
+                sigma=residual_noise_sigma,
+                generator=noise_generator,
+                eps=eps,
+            ).float()
 
         mean_batch = mean_direction.view(1, -1).expand_as(residual)
         if method == "S2S_L":

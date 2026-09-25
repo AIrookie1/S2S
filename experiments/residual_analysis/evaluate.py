@@ -4,10 +4,10 @@
 This experiment implements the three residual analyses described in the paper
 notes while reusing the released S2S-R / S2S-L-Static steering definitions:
 
-A. Residual/oracle alignment with matched, within-category shuffled, and
-   globally shuffled predicted residuals.
-B. Residual-swap MC intervention with Mean only, Shuffled residual, Predicted
-   residual, and Oracle residual.  The Mean-only baseline follows the selected
+A. Residual/oracle alignment with matched, within-category shuffled, globally shuffled, and cross-category
+   cosine-nearest predicted residuals.
+B. Residual-swap MC intervention with Mean only, Shuffled residual, Cross-category cosine-nearest residual,
+   Predicted residual, and Oracle residual.  The Mean-only baseline follows the selected
    steering family: S2S-R uses the released cross-fitted Spherical Steering
    baseline, while S2S-L-Static uses standard linear additive mean steering
    ``h_new = h + strength * v_avg``.  For S2S-R, shuffled/oracle residuals
@@ -92,12 +92,14 @@ from truthfulqa.utilities import format_prompt_with_answer_strings
 CONDITION_ORDER = (
     "mean_only",
     "shuffled_residual",
+    "cross_category_cosine_nearest_residual",
     "predicted_residual",
     "oracle_residual",
 )
 CONDITION_LABELS = {
     "mean_only": "Mean only",
     "shuffled_residual": "Shuffled residual",
+    "cross_category_cosine_nearest_residual": "Cross-category cosine-nearest residual",
     "predicted_residual": "Predicted residual",
     "oracle_residual": "Oracle residual",
 }
@@ -856,6 +858,44 @@ def compute_negative_geometry(
     return rows
 
 
+def cross_category_cosine_nearest_indices(
+    residuals: np.ndarray,
+    categories: np.ndarray,
+    question_ids: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the most cosine-similar donor from a different category.
+
+    Residual rows are expected to be unit-normalized.  A donor must have a
+    different category and, when ``question_ids`` is supplied, a different
+    question.  Ties are resolved by the smallest row index, making this control
+    deterministic and independent of shuffle seeds.
+    """
+    residuals = np.asarray(residuals, dtype=np.float64)
+    categories = np.asarray(categories, dtype=object)
+    if residuals.ndim != 2 or len(residuals) != len(categories):
+        raise ValueError("residuals/categories shape mismatch")
+    q = None if question_ids is None else np.asarray(question_ids)
+    if q is not None and len(q) != len(residuals):
+        raise ValueError("question_ids length mismatch")
+
+    norms = np.linalg.norm(residuals, axis=1, keepdims=True)
+    unit = residuals / np.maximum(norms, 1e-12)
+    cosine = np.clip(unit @ unit.T, -1.0, 1.0)
+    donors = np.full(len(residuals), -1, dtype=np.int64)
+    best_cos = np.full(len(residuals), np.nan, dtype=np.float64)
+    for i in range(len(residuals)):
+        eligible = categories != categories[i]
+        if q is not None:
+            eligible &= q != q[i]
+        eligible[i] = False
+        candidates = np.flatnonzero(eligible)
+        if len(candidates):
+            local = int(np.argmax(cosine[i, candidates]))
+            donors[i] = int(candidates[local])
+            best_cos[i] = float(cosine[i, donors[i]])
+    return donors, best_cos
+
+
 def compute_alignment_controls(
     geometry_rows: list[dict[str, Any]],
     records: list[CandidateRecord],
@@ -882,6 +922,23 @@ def compute_alignment_controls(
 
     within_per_q: dict[int, list[float]] = {int(qi): [] for qi in matched_q}
     global_per_q: dict[int, list[float]] = {int(qi): [] for qi in matched_q}
+
+    cross_donor, cross_donor_cos = cross_category_cosine_nearest_indices(
+        pred, categories, question_ids=q
+    )
+    cross_eligible = cross_donor >= 0
+    cross_alignment = np.full(len(q), np.nan, dtype=np.float64)
+    cross_alignment[cross_eligible] = np.sum(
+        pred[cross_donor[cross_eligible]] * oracle[cross_eligible], axis=1
+    )
+    cross_alignment[cross_eligible] = np.clip(
+        cross_alignment[cross_eligible], -1.0, 1.0
+    )
+    cross_q, cross_q_values = aggregate_mean_by_question(
+        q[cross_eligible], cross_alignment[cross_eligible]
+    )
+    cross_map = dict(zip(cross_q.tolist(), cross_q_values.tolist()))
+
     null_rows: list[dict[str, Any]] = []
     exact_counts = {"within_category": 0, "global": 0}
     eligible_counts = {"within_category": 0, "global": 0}
@@ -953,6 +1010,7 @@ def compute_alignment_controls(
                 "global_shuffle_sd": float(np.std(global_values, ddof=1))
                 if len(global_values) > 1
                 else 0.0,
+                "cross_category_cosine_nearest": float(cross_map.get(int(qi), float("nan"))),
             }
         )
 
@@ -982,6 +1040,10 @@ def compute_alignment_controls(
         / max(eligible_counts["within_category"], 1),
         "global_exact_permutation_fraction": exact_counts["global"]
         / max(eligible_counts["global"], 1),
+        "cross_category_cosine_nearest_eligible_fraction": float(np.mean(cross_eligible)),
+        "cross_category_cosine_nearest_donor_cosine_mean": (
+            float(np.nanmean(cross_donor_cos)) if np.any(cross_eligible) else float("nan")
+        ),
     }
     return question_rows, null_rows, stats
 
@@ -998,6 +1060,7 @@ def summarize_alignment(
             ("matched", "Matched"),
             ("within_category_shuffled", "Category-shuffled"),
             ("global_shuffled", "Global-shuffled"),
+            ("cross_category_cosine_nearest", "Cross-category cosine-nearest"),
         )
     ):
         values = np.asarray([float(row[column]) for row in alignment_question_rows], dtype=float)
@@ -1376,6 +1439,34 @@ def _make_mc_shuffle_map(
     return mapping, float(np.mean(exact))
 
 
+def _make_cross_category_cosine_nearest_map(
+    records: list[CandidateRecord],
+) -> tuple[dict[str, np.ndarray], dict[str, float]]:
+    """Map each candidate to its closest predicted residual from another category."""
+    residuals = np.stack([record.predicted_residual for record in records], axis=0)
+    categories = np.asarray([record.category for record in records], dtype=object)
+    q = np.asarray([record.q_idx for record in records], dtype=np.int64)
+    donors, donor_cos = cross_category_cosine_nearest_indices(
+        residuals, categories, question_ids=q
+    )
+    if np.any(donors < 0):
+        missing = int(np.sum(donors < 0))
+        raise RuntimeError(
+            f"Cross-category cosine-nearest control has no eligible donor for {missing} candidates"
+        )
+    mapping = {
+        record.candidate_id: records[int(donors[idx])].predicted_residual
+        for idx, record in enumerate(records)
+    }
+    meta = {
+        "eligible_fraction": float(np.mean(donors >= 0)),
+        "mean_donor_cosine": float(np.mean(donor_cos)),
+        "min_donor_cosine": float(np.min(donor_cos)),
+        "max_donor_cosine": float(np.max(donor_cos)),
+    }
+    return mapping, meta
+
+
 def evaluate_mc_condition(
     *,
     condition: str,
@@ -1463,9 +1554,9 @@ def evaluate_mc_condition(
                         raise ValueError(
                             f"Unsupported steering_method: {args.steering_method}"
                         )
-                elif condition == "shuffled_residual":
+                elif condition in ("shuffled_residual", "cross_category_cosine_nearest_residual"):
                     if shuffle_map is None:
-                        raise ValueError("shuffled_residual requires shuffle_map")
+                        raise ValueError(f"{condition} requires a residual override map")
                     residual_override = shuffle_map[cid]
                 elif condition == "oracle_residual":
                     residual_override = record.oracle_residual
@@ -1824,6 +1915,29 @@ def main() -> None:
                     )
                 )
 
+            cross_category_map, cross_category_meta = _make_cross_category_cosine_nearest_map(records)
+            mc_shuffle_meta.append(
+                {"condition": "cross_category_cosine_nearest_residual", **cross_category_meta}
+            )
+            mc_rows.extend(
+                evaluate_mc_condition(
+                    condition="cross_category_cosine_nearest_residual",
+                    shuffle_seed_index=None,
+                    shuffle_map=cross_category_map,
+                    results_template=results,
+                    records_by_id=records_by_id,
+                    model=model,
+                    avg=avg,
+                    predictor=predictor,
+                    layer_name=layer_name,
+                    spherical_layer_name=spherical_layer_name,
+                    spherical_bank=spherical_bank,
+                    device=device,
+                    args=args,
+                    score_log_handle=score_log_handle,
+                )
+            )
+
             for shuffle_idx in range(args.mc_shuffle_seeds):
                 shuffle_map, exact_fraction = _make_mc_shuffle_map(
                     records,
@@ -1831,6 +1945,7 @@ def main() -> None:
                 )
                 mc_shuffle_meta.append(
                     {
+                        "condition": "shuffled_residual",
                         "shuffle_seed_index": shuffle_idx,
                         "exact_permutation_fraction": exact_fraction,
                     }
@@ -1930,9 +2045,10 @@ def main() -> None:
                 "h_new = h + strength * v_avg using the Dyn2D strength."
             ),
             "panel_b_residual_control": (
-                "For S2S_R, shuffled/oracle replace c before adaptive_3way_weights so "
-                "alpha/beta/gamma and the margin gate are recomputed from the active residual. "
-                "For S2S_L_Static, shuffled/oracle replace only the residual direction; "
+                "For S2S_R, shuffled/cross-category-cosine-nearest/oracle replace c before "
+                "adaptive_3way_weights so alpha/beta/gamma and the margin gate are recomputed "
+                "from the active residual. For S2S_L_Static, shuffled/cross-category-cosine-nearest/"
+                "oracle replace only the residual direction; "
                 "the recipient sample keeps its own predicted-vector magnitude and the method's "
                 "fixed strength/slerp_t are used exactly as in method/dyn2d/steering.py."
             ),

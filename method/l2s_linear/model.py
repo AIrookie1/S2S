@@ -192,8 +192,15 @@ def fit_l2s(
     learning_rate: float = 1e-3,
     device: str = "cpu",
     seed: int = 42,
+    target_noise_sigma: float = 0.0,
+    noise_seed: int | None = None,
 ) -> tuple[L2SMLP, list[dict[str, float]], dict[str, float]]:
-    """Fit the direct raw-scale MLP using the requested question subset."""
+    """Fit the direct raw-scale MLP using the requested question subset.
+
+    When ``target_noise_sigma`` is nonzero, one relative-noise vector is
+    sampled per selected target before optimization and the resulting
+    corrupted targets are reused unchanged for every epoch/batch.
+    """
     set_seed(seed)
     z_neg = np.asarray(z_neg, dtype=np.float32)
     vectors = np.asarray(vectors, dtype=np.float32)
@@ -208,10 +215,20 @@ def fit_l2s(
         raise ValueError("No L2S pairs belong to the optimization split")
     if epochs <= 0 or batch_size <= 0 or learning_rate <= 0:
         raise ValueError("epochs, batch_size, and learning_rate must be positive")
+    if not np.isfinite(target_noise_sigma) or target_noise_sigma < 0:
+        raise ValueError("target_noise_sigma must be finite and non-negative")
 
     dev = torch.device(device if device != "cuda" or torch.cuda.is_available() else "cpu")
     x = torch.as_tensor(z_neg[train_mask], dtype=torch.float32, device=dev)
-    y = torch.as_tensor(vectors[train_mask], dtype=torch.float32, device=dev)
+    y_clean = torch.as_tensor(vectors[train_mask], dtype=torch.float32, device=dev)
+    y = y_clean
+    if target_noise_sigma > 0:
+        generator = torch.Generator(device=dev)
+        generator.manual_seed(int(seed if noise_seed is None else noise_seed))
+        eps = torch.randn(y_clean.shape, generator=generator, device=dev, dtype=y_clean.dtype)
+        eps = F.normalize(eps, p=2, dim=-1, eps=1e-12)
+        target_norm = torch.linalg.vector_norm(y_clean, dim=-1, keepdim=True)
+        y = y_clean + float(target_noise_sigma) * target_norm * eps
     model = L2SMLP(x.shape[-1], hidden_dim, y.shape[-1]).to(dev)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     history: list[dict[str, float]] = []
@@ -230,15 +247,17 @@ def fit_l2s(
             batch_losses.append(float(loss.detach().cpu()))
         with torch.no_grad():
             train_mse = float(F.mse_loss(model(x), y).cpu())
+            clean_train_mse = float(F.mse_loss(model(x), y_clean).cpu())
         record = {
             "epoch": float(epoch),
             "loss": float(np.mean(batch_losses)),
             "train_mse": train_mse,
+            "clean_train_mse": clean_train_mse,
         }
         history.append(record)
         print(
             f"epoch {epoch:03d} | loss={record['loss']:.6e} "
-            f"train_mse={train_mse:.6e}",
+            f"train_mse={train_mse:.6e} clean_mse={clean_train_mse:.6e}",
             flush=True,
         )
 
@@ -257,6 +276,9 @@ def fit_l2s(
             "target_norm_mean": float(torch.linalg.vector_norm(all_y, dim=-1).mean().cpu()),
             "prediction_norm_mean": float(torch.linalg.vector_norm(prediction, dim=-1).mean().cpu()),
             "raw_input_norm_mean": float(torch.linalg.vector_norm(all_x, dim=-1).mean().cpu()),
+            "target_noise_sigma": float(target_noise_sigma),
+            "noise_seed": int(seed if noise_seed is None else noise_seed),
+            "noisy_train_target_mse": float(F.mse_loss(y, y_clean).cpu()),
         }
     return model.cpu(), history, metrics
 

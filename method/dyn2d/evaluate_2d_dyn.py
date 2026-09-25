@@ -80,6 +80,14 @@ def main() -> None:
     )
     parser.add_argument("--slerp_eps", type=float, default=1e-8)
     parser.add_argument("--small_angle_threshold", type=float, default=1e-4)
+    parser.add_argument(
+        "--residual_noise_sigma", type=float, default=0.0,
+        help="Inference-only relative Gaussian noise on the predicted residual direction.",
+    )
+    parser.add_argument(
+        "--residual_noise_seed", type=int, default=42,
+        help="Seed for inference-only residual noise.",
+    )
     parser.add_argument("--output_path", default=None)
     parser.add_argument("--save_details", action="store_true")
     args = parser.parse_args()
@@ -88,6 +96,8 @@ def main() -> None:
         parser.error("--strength must be finite")
     if not np.isfinite(args.slerp_t) or not 0.0 <= args.slerp_t <= 1.0:
         parser.error("--slerp_t must be in [0, 1]")
+    if not np.isfinite(args.residual_noise_sigma) or args.residual_noise_sigma < 0:
+        parser.error("--residual_noise_sigma must be finite and non-negative")
 
     set_seed(args.seed)
     device = resolve_device(args.device)
@@ -158,6 +168,8 @@ def main() -> None:
         small_angle_threshold=args.small_angle_threshold,
         method=args.method,
         weight_kappa=args.weight_kappa,
+        residual_noise_sigma=args.residual_noise_sigma,
+        residual_noise_seed=args.residual_noise_seed,
         stats=stats,
     )
 
@@ -257,6 +269,8 @@ def main() -> None:
             "few_shot": bool(args.few_shot),
             "preset": args.preset,
             "steering_enabled": not args.no_intervention,
+            "residual_noise_sigma": float(args.residual_noise_sigma),
+            "residual_noise_seed": int(args.residual_noise_seed),
         },
         "metrics": metric_values,
         "steering_stats": steering_stats,

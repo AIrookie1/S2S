@@ -53,7 +53,7 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
             "title": None,
             "linear_shared_mean": "mean steer vector",
             "spherical_shared_mean": "Spherical + shared mean",
-            "gt_neg_to_pos": "pair-specific vector",
+            "gt_neg_to_pos": "sample-specific vector",
         },
         "show": {
             "xlabel": True,
@@ -161,7 +161,7 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
             "panel_c_ylabel": "Angular-error reduction vs. mean-only (deg)",
         },
         "show": {"title": False, "legend": False},
-        "layout": {"left": 0.055, "right": 0.995, "bottom": 0.22, "top": 0.93, "wspace": 0.36},
+        "layout": {"left": 0.19, "right": 0.985, "bottom": 0.22, "top": 0.88},
     },
     "word_number": {
         "size": "word_number_two_panel",
