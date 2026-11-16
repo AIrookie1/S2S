@@ -19,15 +19,15 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.S2S_R.eval_utils import (
+from methods.S2S_R.eval_utils import (
     HF_NAMES, calculate_scores_fewshot, calculate_scores_zeroshot, format_best,
     get_layer_name, load_truthfulqa_mc_dataframe, resolve_device, set_seed,
     split_multi_answer,
 )
-from method.l2s_linear.model import load_l2s_checkpoint as load_linear_checkpoint
-from method.l2s_linear.steering import get_l2s_linear_intervention
-from method.l2s_slerp.model import load_l2s_checkpoint as load_slerp_checkpoint
-from method.l2s_slerp.steering import get_l2s_slerp_intervention
+from methods.l2s_linear.model import load_l2s_checkpoint as load_linear_checkpoint
+from methods.l2s_linear.steering import get_l2s_linear_intervention
+from methods.l2s_slerp.model import load_l2s_checkpoint as load_slerp_checkpoint
+from methods.l2s_slerp.steering import get_l2s_slerp_intervention
 from truthfulqa.models import MC_calcs, set_columns
 
 
@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--linear_checkpoint_path", required=True)
     p.add_argument("--slerp_checkpoint_path", required=True)
     p.add_argument("--model_dir", default=None)
-    p.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
+    p.add_argument("--csv_path", default="./data/truthfulqa/TruthfulQA.csv")
     p.add_argument("--layer", type=int, default=14)
     p.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
     p.add_argument("--linear_alpha", type=float, default=1.4)

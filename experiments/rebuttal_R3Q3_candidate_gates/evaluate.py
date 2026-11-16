@@ -23,12 +23,12 @@ import torch
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from method.S2S_R.predictor import predict_residual
-from method.S2S_R.evaluate_S2S_R import (
+from methods.S2S_R.predictor import predict_residual
+from methods.S2S_R.evaluate_S2S_R import (
     adaptive_3way_weights, get_s2s_r_intervention, norm,
 )
-from method.S2S_R.evaluate_predictor import load_components
-from method.S2S_R.eval_utils import (
+from methods.S2S_R.evaluate_predictor import load_components
+from methods.S2S_R.eval_utils import (
     calculate_scores_zeroshot, format_best, get_layer_name,
     load_truthfulqa_mc_dataframe, set_seed, split_multi_answer,
 )
@@ -161,7 +161,7 @@ def main():
     parser.add_argument("--model_name", default="llama3.1-8B-Instruct")
     parser.add_argument("--model_dir", default=__import__("os").environ.get("LLAMA_MODEL_DIR", "models/Meta-Llama-3.1-8B-Instruct"))
     parser.add_argument("--checkpoint_dir", default=str(ROOT / "checkpoints/S2S_R/truthfulqa/llama3.1-8B-Instruct"))
-    parser.add_argument("--csv_path", default=str(ROOT / "TruthfulQA/data/v1/TruthfulQA.csv"))
+    parser.add_argument("--csv_path", default=str(ROOT / "data/truthfulqa/TruthfulQA.csv"))
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--folds", type=int, nargs="+", default=[0, 1])
     parser.add_argument("--modes", nargs="+", choices=["apply", "observe"], default=["apply", "observe"])
@@ -192,8 +192,8 @@ def main():
     checkpoints = [(f, Path(args.checkpoint_dir) / f"{args.model_name}_layer{args.layer}_predictor_fold{f}_mean.npz") for f in args.folds]
     test_sets, metadata = validate_splits(checkpoints, len(hf))
     source_paths = [Path(__file__), Path(__file__).with_name("analyze.py"),
-                    ROOT / "method/S2S_R/evaluate_S2S_R.py",
-                    ROOT / "method/S2S_R/eval_utils.py", ROOT / "method/S2S_R/predictor.py"]
+                    ROOT / "methods/S2S_R/evaluate_S2S_R.py",
+                    ROOT / "methods/S2S_R/eval_utils.py", ROOT / "methods/S2S_R/predictor.py"]
     config = {
         **vars(args), "started_utc": datetime.now(timezone.utc).isoformat(),
         "gpu_visibility": os.environ.get("CUDA_VISIBLE_DEVICES"),

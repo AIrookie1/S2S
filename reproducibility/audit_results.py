@@ -297,7 +297,7 @@ def write_audit(source, output, sanitizer=lambda s: s):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--source", type=Path, default=ROOT)
-    p.add_argument("--output", type=Path, default=ROOT / "artifacts")
+    p.add_argument("--output", type=Path, default=ROOT / "results/reference")
     a = p.parse_args()
     from reproducibility.build_release import sanitize
     print(json.dumps(write_audit(a.source, a.output, lambda s: sanitize(s, a.source.resolve())), indent=2))

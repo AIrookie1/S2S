@@ -1,15 +1,7 @@
-# Review release contents
+# Artifact scope
 
-Paper mapping: `EXPERIMENT_INDEX.csv`. Commands: root `README.md`.
+The working repository contains methods, configurations, experiment entries, tests, documentation, and tracked input/reference snapshots. Runtime weights and new outputs are separate from source-controlled inputs.
 
-Removed from the public copy: obsolete basis-routing/cosine scripts, old word-count
-plots, the final-token-only GT rerun, duplicate comparison entry points, long local
-execution diaries, raw response/strategy drafts, and redundant setup validators.
-Required noise-evaluation helpers, upstream licenses, benchmark data, tests and
-compact archived evidence remain. Original workspace files are not deleted.
+The anonymous export includes only the allowlisted source/configuration tree, tests, the small TruthfulQA snapshot, upstream licenses, and archived reference scores. It excludes Git history, credentials, model caches, private supplementary data, virtual environments, and generated results.
 
-Figure 1 and the right-hand Figure 5 diagrams are schematics. Figure 4(c) and the
-full left-hand Figure 5 baseline comparison require original external LoFiT/LoReFT
-implementations/vector artifacts. They are recorded as unavailable rather than
-assigned a fictitious runnable experiment. The Figure 2(a) entry is the retained
-label-informed train-fold diagnostic, not a certified historical curve replay.
+Experiment requirements and missing inputs remain as listed in `docs/EXPERIMENT_INDEX.csv` and `docs/DATA.md`; organization does not certify historical figures or newly execute full GPU benchmarks.

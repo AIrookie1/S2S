@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "scanned_files": 489,
+  "git_history_exported": false,
+  "runtime_outputs_exported": false,
+  "scope": "Source-content scan; account metadata and recognizable code remain outside this check.",
+  "working_tree_has_git_history": true,
+  "publish_export_only": true
+}

@@ -54,8 +54,8 @@ def main():
     write_json(output / 'shared_selections.json', selections)
 
     import torch
-    from method.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
-    from method.S2S_R.eval_utils import load_truthfulqa_mc_dataframe
+    from methods.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
+    from methods.S2S_R.eval_utils import load_truthfulqa_mc_dataframe
     torch.set_num_threads(4)
     set_seed(config['seed'])
     model = None
@@ -75,7 +75,7 @@ def main():
             if model is None:
                 model, tokenizer, layer_path, layers = load_model(config)
                 block = layers[config['layer']]
-                frame, _dataset = load_truthfulqa_mc_dataframe(str(ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'))
+                frame, _dataset = load_truthfulqa_mc_dataframe(str(ROOT / 'data/truthfulqa/TruthfulQA.csv'))
             hook = make_hook(method, parameters, source / f'fold{fold}', block)
             metrics, details = evaluate(model, tokenizer, block, frame, split['test'], hook, config)
             report = dict(fold=fold, method=method, parameters=parameters,

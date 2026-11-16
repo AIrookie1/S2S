@@ -16,9 +16,9 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.S2S_L.steering import get_s2s_l_intervention
-from method.S2S_R.evaluate_predictor import load_components
-from method.S2S_R.eval_utils import (
+from methods.S2S_L.steering import get_s2s_l_intervention
+from methods.S2S_R.evaluate_predictor import load_components
+from methods.S2S_R.eval_utils import (
     HF_NAMES,
     calculate_scores_fewshot,
     calculate_scores_zeroshot,
@@ -145,7 +145,7 @@ def main() -> None:
     parser.add_argument("--checkpoint_path", required=True)
     parser.add_argument("--expected_fold", type=int, default=None)
     parser.add_argument("--model_dir", default=None)
-    parser.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
+    parser.add_argument("--csv_path", default="./data/truthfulqa/TruthfulQA.csv")
     parser.add_argument("--layer", type=int, default=14)
     parser.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
     parser.add_argument(

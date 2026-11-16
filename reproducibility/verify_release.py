@@ -1,4 +1,4 @@
-"""Verify anonymous export hashes and rescan its complete text content."""
+"""Verify release-source hashes while separating local runtime artifacts."""
 import argparse
 import hashlib
 import json
@@ -6,35 +6,57 @@ from pathlib import Path
 
 from reproducibility.privacy import audit_tree
 
+RUNTIME_DIRS = {"models", "features", "checkpoints", "prototypes", "dist", "build", ".venv", ".venv-scaling"}
+CACHE_DIRS = {"__pycache__", ".pytest_cache", ".git"}
 
-def verify(root, allow_git=False):
+
+def _runtime_path(relative):
+    parts = relative.parts
+    if not parts:
+        return False
+    if parts[0] in RUNTIME_DIRS or parts[0].startswith(".venv"):
+        return True
+    if parts[0] == "results" and len(parts) > 1 and parts[1] not in ("reference", "README.md"):
+        return True
+    return parts[0] == "data" and len(parts) > 1 and parts[1] not in ("truthfulqa", "README.md")
+
+
+def verify(root, allow_git=False, strict=False):
     root = Path(root)
-    manifest = json.loads((root / "release_manifest.json").read_text())
-    expected = manifest["files"]
-    failures = []
+    manifest_path = root / "reports/release_manifest.json"
+    if not manifest_path.is_file():
+        return [{"file": "reports/release_manifest.json", "rule": "missing release manifest"}]
+    expected = json.loads(manifest_path.read_text())["files"]
+    findings = []
     for name, checksum in expected.items():
         path = root / name
         if not path.is_file() or path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
-            failures.append(dict(file=name, rule="missing or changed release file"))
-    allowed = set(expected) | {"release_manifest.json", "privacy_report.json"}
+            findings.append({"file": name, "rule": "missing or changed release file"})
+    allowed = set(expected) | {"reports/release_manifest.json", "reports/privacy.json"}
+    if (root / ".git").exists() and not allow_git:
+        findings.append({"file": ".git", "rule": "Git history is not part of a clean anonymous export"})
     for path in root.rglob("*"):
         rel = path.relative_to(root)
-        if any(x in (".git", "__pycache__", ".pytest_cache") for x in rel.parts):
+        if any(part in CACHE_DIRS for part in rel.parts) or (not strict and _runtime_path(rel)):
             continue
-        if path.is_file() and str(rel) not in allowed:
-            failures.append(dict(file=str(rel), rule="file added after release audit"))
-    failures += audit_tree(root, allow_git=allow_git)
-    return failures
+        if path.is_symlink():
+            findings.append({"file": str(rel), "rule": "unexpected symlink"})
+        elif path.is_file() and str(rel) not in allowed:
+            findings.append({"file": str(rel), "rule": "file added after source audit"})
+    if strict:
+        findings += audit_tree(root, allow_git=allow_git)
+    return findings
 
 
 def main():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("directory", type=Path, nargs="?", default=Path.cwd())
-    p.add_argument("--allow-git", action="store_true")
-    a = p.parse_args()
-    failures = verify(a.directory, a.allow_git)
-    print(json.dumps(dict(passed=not failures, findings=failures), indent=2))
-    raise SystemExit(bool(failures))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("directory", type=Path, nargs="?", default=Path.cwd())
+    parser.add_argument("--allow-git", action="store_true")
+    parser.add_argument("--strict", action="store_true")
+    arguments = parser.parse_args()
+    findings = verify(arguments.directory, arguments.allow_git, arguments.strict)
+    print(json.dumps({"passed": not findings, "findings": findings}, indent=2))
+    raise SystemExit(bool(findings))
 
 
 if __name__ == "__main__":

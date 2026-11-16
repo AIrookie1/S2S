@@ -11,10 +11,10 @@ from torch import nn
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from experiments.rebuttal_R1W2_model_scaling.common import write_json
-from method.S2S_R.eval_utils import get_instruction, load_truthfulqa_mc_dataframe, split_multi_answer, format_best
-from method.S2S_R.predictor import load_feature_pairs
-from method.S2S_L.steering import get_s2s_l_intervention
-from method.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
+from methods.S2S_R.eval_utils import get_instruction, load_truthfulqa_mc_dataframe, split_multi_answer, format_best
+from methods.S2S_R.predictor import load_feature_pairs
+from methods.S2S_L.steering import get_s2s_l_intervention
+from methods.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
 from experiments.fig2bc_l2s_reliability.metrics import rowwise_vector_metrics
 from truthfulqa.models import MC_calcs, set_columns
 
@@ -388,7 +388,7 @@ def main():
         error=float((full-cached).abs().max())
         if error>.02:raise ValueError(f'Cached tail equivalence failed: {error}')
     write_json(args.output/'cache_audit.json',dict(max_logprob_error=error))
-    frame,_=load_truthfulqa_mc_dataframe('./TruthfulQA/data/v1/TruthfulQA.csv')
+    frame,_=load_truthfulqa_mc_dataframe('./data/truthfulqa/TruthfulQA.csv')
     neg,pos,vector_q,_=load_feature_pairs(args.feature,positive_mode='cartesian')
     raw_vectors=pos-neg
     for fold in args.folds:

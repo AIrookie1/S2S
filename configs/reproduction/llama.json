@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "model": "llama",
+  "model_name": "llama3.1-8B-Instruct",
+  "model_dir": "models/Llama",
+  "layer": 14,
+  "execution": {
+    "device": "cuda",
+    "dtype": "float16",
+    "gpu": "0",
+    "seed": 42,
+    "work_dir": "results/reproduction"
+  },
+  "training": {
+    "positive_mode": "mean",
+    "num_folds": 2,
+    "predictor_fraction": 0.5,
+    "mlp_hidden": 256,
+    "epochs": 2000,
+    "batch_size": 256,
+    "learning_rate": 0.001
+  },
+  "main": {
+    "additive_alpha": 1.0,
+    "l2s_alpha": 1.0,
+    "spherical": {
+      "kappa": 20.0,
+      "alpha": 0.7,
+      "beta": -0.15
+    },
+    "s2s_l": {
+      "method": "S2S_L_Static",
+      "strength": 3.0,
+      "slerp_t": 0.2
+    },
+    "s2s_r": {
+      "weight_kappa": 3.0,
+      "margins": {
+        "0": -0.7,
+        "1": -0.7
+      }
+    }
+  }
+}

@@ -1,0 +1,589 @@
+{
+  "schema_version": 1,
+  "experiments": [
+    {
+      "id": "table1",
+      "title": "TruthfulQA multiple-choice, both folds",
+      "paper": "Table 1",
+      "group": "main",
+      "backend": "suite",
+      "suite": "main"
+    },
+    {
+      "id": "table1-generation",
+      "title": "TruthfulQA generation and truth/info judges",
+      "paper": "Table 1",
+      "group": "main",
+      "backend": "python",
+      "entry": "experiments/table1_truthfulqa/table1_run_generation.py",
+      "arguments": [
+        "--model",
+        "{model}",
+        "--model-dir",
+        "{model_dir}",
+        "--work-dir",
+        "{work_dir}",
+        "--gpu",
+        "{gpu}",
+        "--truth-judge-dir",
+        "{truth_judge_dir}",
+        "--info-judge-dir",
+        "{info_judge_dir}"
+      ],
+      "native_execute": true,
+      "accept_folds": true,
+      "required_fields": [
+        "truth_judge_dir",
+        "info_judge_dir"
+      ],
+      "depends_on": [
+        "table1"
+      ]
+    },
+    {
+      "id": "table2",
+      "title": "Independent training on generic tasks",
+      "paper": "Table 2",
+      "group": "main",
+      "backend": "suite",
+      "suite": "generic",
+      "accept_datasets": true
+    },
+    {
+      "id": "table3",
+      "title": "Components and the exact review mean-only control",
+      "paper": "Table 3 / R3 Q2",
+      "group": "main",
+      "backend": "suite",
+      "suite": "component"
+    },
+    {
+      "id": "table4",
+      "title": "Generation-only and end-to-end throughput",
+      "paper": "Table 4",
+      "group": "main",
+      "backend": "shell",
+      "entry": "experiments/table4_generation_efficiency/table4_run.sh",
+      "env": {
+        "S2SL_CHECKPOINT": "{s2s_checkpoint0}",
+        "S2SR_CHECKPOINT": "{s2s_checkpoint0}",
+        "SPHERICAL_PROTOTYPE": "{spherical_prototype0}"
+      },
+      "models": [
+        "llama"
+      ],
+      "default_folds": [
+        0
+      ],
+      "required_files": [
+        "s2s_checkpoint0",
+        "spherical_prototype0"
+      ],
+      "depends_on": [
+        "table1"
+      ]
+    },
+    {
+      "id": "fig2a",
+      "title": "Label-informed train-fold oracle diagnostic",
+      "paper": "Figure 2(a)",
+      "group": "main",
+      "backend": "python",
+      "entry": "experiments/fig2a_oracle_vectors/fig2a_run.py",
+      "arguments": [
+        "--model",
+        "{model}",
+        "--model-dir",
+        "{model_dir}",
+        "--work-dir",
+        "{work_dir}",
+        "--gpu",
+        "{gpu}"
+      ],
+      "native_execute": true,
+      "native_resume": true,
+      "fixed_folds": [
+        0,
+        1
+      ],
+      "note": "Diagnostic reference; historical curve replay is not certified."
+    },
+    {
+      "id": "fig2bc",
+      "title": "Mean/L2S performance and vector fidelity",
+      "paper": "Figure 2(b,c)",
+      "group": "main",
+      "backend": "python",
+      "entry": "experiments/fig2bc_l2s_reliability/fig2bc_run.py",
+      "arguments": [
+        "--model",
+        "{model}",
+        "--model-dir",
+        "{model_dir}",
+        "--work-dir",
+        "{work_dir}",
+        "--gpu",
+        "{gpu}"
+      ],
+      "native_execute": true,
+      "native_resume": true,
+      "fixed_folds": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "fig3a",
+      "title": "S2S_L strength and interpolation grid",
+      "paper": "Figure 3(a)",
+      "group": "main",
+      "backend": "shell",
+      "entry": "experiments/fig3a_s2s_l_hyperparameters/fig3a_run.sh",
+      "env": {
+        "AUTO_PLOT": "0"
+      },
+      "fold_env": "FOLDS",
+      "plot_entry": "experiments/fig3a_s2s_l_hyperparameters/fig3a_plot.sh"
+    },
+    {
+      "id": "fig3b-hidden",
+      "title": "Predictor hidden width",
+      "paper": "Figure 3(b)",
+      "group": "main",
+      "backend": "shell",
+      "entry": "experiments/fig3b_hidden_size/fig3b_hidden_run.sh",
+      "env": {
+        "RUN_EXTRACT": "1",
+        "AUTO_PLOT": "0"
+      },
+      "fold_env": "FOLDS",
+      "plot_entry": "experiments/fig3b_hidden_size/fig3b_hidden_plot.sh"
+    },
+    {
+      "id": "fig3b-fraction",
+      "title": "Predictor/geometry training fraction",
+      "paper": "Figure 3(b)",
+      "group": "main",
+      "backend": "shell",
+      "entry": "experiments/fig3b_predictor_fraction/fig3b_fraction_run.sh",
+      "env": {
+        "RUN_EXTRACT": "1",
+        "AUTO_PLOT": "0",
+        "SEEDS": "42 123 0"
+      },
+      "default_folds": [
+        0
+      ],
+      "fold_env": "FOLD_IDX",
+      "plot_entry": "experiments/fig3b_predictor_fraction/fig3b_fraction_plot.sh",
+      "fixed_seed_grid": [
+        42,
+        123,
+        0
+      ],
+      "plot_env": {
+        "SEEDS": "42 123 0"
+      }
+    },
+    {
+      "id": "fig3c-margin",
+      "title": "Gate-margin sweep",
+      "paper": "Figure 3(c)",
+      "group": "main",
+      "backend": "shell",
+      "entry": "experiments/fig3c_gate_margin/fig3c_margin_run.sh",
+      "env": {
+        "RUN_EXTRACT": "1",
+        "AUTO_PLOT": "0"
+      },
+      "fold_env": "FOLDS",
+      "plot_entry": "experiments/fig3c_gate_margin/fig3c_margin_plot.sh"
+    },
+    {
+      "id": "fig3c-kappa",
+      "title": "Adaptive-weight sharpness",
+      "paper": "Figure 3(c)",
+      "group": "main",
+      "backend": "shell",
+      "entry": "experiments/fig3c_weight_sharpness/fig3c_kappa_run.sh",
+      "env": {
+        "RUN_EXTRACT": "1",
+        "AUTO_PLOT": "0"
+      },
+      "fold_env": "FOLDS",
+      "plot_entry": "experiments/fig3c_weight_sharpness/fig3c_kappa_plot.sh"
+    },
+    {
+      "id": "fig3d",
+      "title": "Token-level adaptive-weight distributions",
+      "paper": "Figure 3(d)",
+      "group": "main",
+      "backend": "shell",
+      "entry": "experiments/fig3d_adaptive_weights/fig3d_plot.sh",
+      "env": {
+        "WEIGHT_KAPPAS": "1 5 10 20"
+      },
+      "default_folds": [
+        0
+      ],
+      "fold_env": "FOLD_IDX",
+      "depends_on": [
+        "table1"
+      ]
+    },
+    {
+      "id": "fig4ab",
+      "title": "Residual replacement and transfer diagnostics",
+      "paper": "Figure 4(a,b)",
+      "group": "main",
+      "backend": "python",
+      "entry": "experiments/fig4ab_residual_transfer/fig4ab_run.py",
+      "arguments": [
+        "--model",
+        "{model}",
+        "--model-dir",
+        "{model_dir}",
+        "--work-dir",
+        "{work_dir}",
+        "--gpu",
+        "{gpu}"
+      ],
+      "native_execute": true,
+      "accept_folds": true,
+      "depends_on": [
+        "table1"
+      ]
+    },
+    {
+      "id": "fig5-noise",
+      "title": "Fixed training-target corruption",
+      "paper": "Figure 5 middle",
+      "group": "main",
+      "backend": "suite",
+      "suite": "noise"
+    },
+    {
+      "id": "r1-noise",
+      "title": "Clean-predictor inference residual-direction noise",
+      "paper": "R1 W1",
+      "group": "rebuttal",
+      "backend": "python",
+      "entry": "experiments/rebuttal_R1W1_inference_noise/rebuttal_R1W1_run.py",
+      "arguments": [
+        "--model",
+        "{model}",
+        "--model-dir",
+        "{model_dir}",
+        "--work-dir",
+        "{work_dir}",
+        "--gpu",
+        "{gpu}"
+      ],
+      "native_execute": true,
+      "native_resume": true,
+      "accept_folds": true,
+      "default_folds": [
+        0
+      ]
+    },
+    {
+      "id": "r1-scales",
+      "title": "Qwen2.5 0.5B/1.5B/3B/14B comparison",
+      "paper": "R1 W2 / R2 W6",
+      "group": "rebuttal",
+      "backend": "scaling_batch",
+      "model_keys": [
+        "qwen05",
+        "qwen15",
+        "qwen3",
+        "qwen14"
+      ],
+      "dependency_profile": "scaling",
+      "needs_model": false
+    },
+    {
+      "id": "r1-models",
+      "title": "Qwen3.5 and Nemotron comparison",
+      "paper": "R1 W2 / R2 W6",
+      "group": "rebuttal",
+      "backend": "scaling_batch",
+      "model_keys": [
+        "qwen35",
+        "nemotron_nano8b"
+      ],
+      "default_epochs": 250,
+      "dependency_profile": "scaling",
+      "needs_model": false
+    },
+    {
+      "id": "r2-spherical-grid",
+      "title": "Expanded Spherical Steering development search",
+      "paper": "R1 W2 / R2 W6",
+      "group": "rebuttal",
+      "backend": "scaling_followup",
+      "entry": "experiments/rebuttal_R1W2_model_scaling/retune_spherical.py",
+      "arguments": [],
+      "dependency_profile": "scaling",
+      "needs_model": false,
+      "depends_on": [
+        "r1-scales",
+        "r1-models"
+      ],
+      "model_keys": [
+        "qwen05",
+        "qwen15",
+        "qwen3",
+        "qwen14",
+        "qwen35",
+        "nemotron_nano8b"
+      ]
+    },
+    {
+      "id": "r2-fixed-t",
+      "title": "Fixed interpolation t=0.2/0.4 comparison",
+      "paper": "R2 W4",
+      "group": "rebuttal",
+      "backend": "scaling_followup",
+      "entry": "experiments/rebuttal_R1W2_model_scaling/compare_slerp.py",
+      "arguments": [],
+      "dependency_profile": "scaling",
+      "needs_model": false,
+      "depends_on": [
+        "r1-scales",
+        "r1-models",
+        "fig3a"
+      ],
+      "model_keys": [
+        "qwen05",
+        "qwen15",
+        "qwen3",
+        "qwen14",
+        "qwen35",
+        "nemotron_nano8b"
+      ]
+    },
+    {
+      "id": "r2-layers",
+      "title": "Layer-wise exploratory performance sweep",
+      "paper": "R2 W5",
+      "group": "rebuttal",
+      "backend": "shell",
+      "entry": "experiments/rebuttal_R2W5_layer_sweep/run_llama.sh",
+      "env": {
+        "SEARCH_PROFILE": "{search_profile}"
+      },
+      "models": [
+        "llama"
+      ]
+    },
+    {
+      "id": "r2-bipo",
+      "title": "Standalone BiPO baseline and constant-vector calibration",
+      "paper": "R2 Q4 / BiPO",
+      "group": "rebuttal",
+      "backend": "python",
+      "entry": "experiments/rebuttal_R2Q4_bipo/rebuttal_R2Q4_run.py",
+      "arguments": [
+        "--model-dir",
+        "{model_dir}",
+        "--feature",
+        "{feature}",
+        "--epochs",
+        "{epochs}"
+      ],
+      "models": [
+        "llama"
+      ],
+      "default_epochs": 20,
+      "accept_folds": true,
+      "required_files": [
+        "feature"
+      ],
+      "depends_on": [
+        "table1"
+      ]
+    },
+    {
+      "id": "r2-bipo-calibration",
+      "title": "BiPO anchor with learned S2S predictors",
+      "paper": "R2 Q4",
+      "group": "rebuttal",
+      "backend": "python",
+      "entry": "experiments/rebuttal_R2Q4_bipo/run_mlp_s2s.py",
+      "arguments": [
+        "--model-dir",
+        "{model_dir}",
+        "--feature",
+        "{feature}"
+      ],
+      "models": [
+        "llama"
+      ],
+      "required_files": [
+        "feature"
+      ],
+      "depends_on": [
+        "r2-bipo"
+      ]
+    },
+    {
+      "id": "r2-bipo-analysis",
+      "title": "BiPO reliability and paired comparison report",
+      "paper": "R2 Q4",
+      "group": "rebuttal",
+      "backend": "python",
+      "entry": "experiments/rebuttal_R2Q4_bipo/analyze.py",
+      "arguments": [],
+      "models": [
+        "llama"
+      ],
+      "needs_model": false,
+      "depends_on": [
+        "r2-bipo"
+      ]
+    },
+    {
+      "id": "r3-mean-control",
+      "title": "Both-fold mean + AW + Gate at the review settings",
+      "paper": "R3 Q2",
+      "group": "rebuttal",
+      "backend": "suite",
+      "suite": "component"
+    },
+    {
+      "id": "r3-gates",
+      "title": "Applied and observe-only candidate gate rates",
+      "paper": "R3 Q3",
+      "group": "rebuttal",
+      "backend": "suite",
+      "suite": "gate"
+    },
+    {
+      "id": "r3-margin",
+      "title": "Margin sweep with label-conditioned gate rates",
+      "paper": "R3 Q3",
+      "group": "rebuttal",
+      "backend": "suite",
+      "suite": "margin"
+    },
+    {
+      "id": "mmsafe-generate",
+      "title": "Free generation, EOS and token-limit accounting",
+      "paper": "R2 W6 / R3 generation",
+      "group": "rebuttal",
+      "backend": "suite",
+      "suite": "generation",
+      "required_fields": [
+        "prompts"
+      ],
+      "accept_prompts": true
+    },
+    {
+      "id": "mmsafe-score",
+      "title": "Safety thresholds on the exact generated prompt set",
+      "paper": "R2 W6 / R3 generation",
+      "group": "rebuttal",
+      "backend": "python",
+      "entry": "reproducibility/safety.py",
+      "arguments": [
+        "--generations",
+        "{generations}",
+        "--scores",
+        "{scores}",
+        "--judge-config",
+        "{judge_config}",
+        "--thresholds",
+        "{thresholds}",
+        "--output-dir",
+        "{safety_output}"
+      ],
+      "needs_model": false,
+      "required_fields": [
+        "generations",
+        "scores",
+        "judge_config"
+      ]
+    },
+    {
+      "id": "supp-transfer",
+      "title": "TruthfulQA-to-generic transfer, separate from Table 2",
+      "paper": "R2 Q2 supplement",
+      "group": "supplement",
+      "backend": "shell",
+      "entry": "experiments/rebuttal_R2Q2_cross_task_transfer/rebuttal_R2Q2_run.sh",
+      "env": {
+        "RUN_EXTRACT": "1"
+      },
+      "models": [
+        "llama"
+      ],
+      "fixed_work_dir": "results/reproduction",
+      "depends_on": [
+        "table2"
+      ]
+    },
+    {
+      "id": "supp-prediction-errors",
+      "title": "Official-split predictor error diagnostics",
+      "paper": "Prediction-error supplement",
+      "group": "supplement",
+      "backend": "python",
+      "entry": "experiments/rebuttal_prediction_error/run_official.py",
+      "arguments": [],
+      "models": [
+        "llama"
+      ],
+      "fixed_work_dir": "results/reproduction",
+      "depends_on": [
+        "table2",
+        "supp-transfer"
+      ]
+    },
+    {
+      "id": "supp-vector-metrics",
+      "title": "Raw-pair direction/norm diagnostics",
+      "paper": "Prediction-error supplement",
+      "group": "supplement",
+      "backend": "python",
+      "entry": "experiments/rebuttal_prediction_error/run_reliability.py",
+      "arguments": [],
+      "models": [
+        "llama"
+      ],
+      "fixed_work_dir": "results/reproduction",
+      "depends_on": [
+        "supp-prediction-errors"
+      ]
+    },
+    {
+      "id": "supp-geometry",
+      "title": "Sampled geometry-to-decision diagnostics",
+      "paper": "Geometry supplement",
+      "group": "supplement",
+      "backend": "python",
+      "entry": "experiments/rebuttal_geometry_diagnostics/rebuttal_geometry_run.py",
+      "arguments": [
+        "--model-dir",
+        "{model_dir}"
+      ],
+      "models": [
+        "llama"
+      ],
+      "fixed_work_dir": "results/reproduction",
+      "depends_on": [
+        "table1",
+        "table2"
+      ],
+      "default_seed": 20261111
+    },
+    {
+      "id": "external-vectors",
+      "title": "Original external vector baselines",
+      "paper": "Figure 4(c) / Figure 5 left",
+      "group": "external",
+      "backend": "unavailable",
+      "needs_model": false,
+      "note": "Original LoFiT/LoReFT implementations and vector artifacts are not bundled."
+    }
+  ]
+}

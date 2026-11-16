@@ -2,7 +2,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/script/common.sh"
+source "$REPO_ROOT/scripts/common.sh"
 DRY_RUN="${DRY_RUN:-0}"
 RUN_EXTRACT="${RUN_EXTRACT:-auto}"
 RUN_TRAIN="${RUN_TRAIN:-1}"
@@ -18,11 +18,11 @@ require_file(){ [[ "$DRY_RUN" == 1 || -s "$1" ]] || { echo "Missing required fil
 # Each dataset gets a fresh shell so sourced defaults cannot leak to the next one.
 for DATASET_KEY in "${DATASET_KEYS[@]}"; do (
   case "$DATASET_KEY" in boolq|copa|storycloze|mmlu_global|winogrande) ;; *) echo "Unknown dataset: $DATASET_KEY" >&2; exit 2 ;; esac
-  source "$REPO_ROOT/hyperparams/S2S_R/LLAMA/generic/$DATASET_KEY.sh"
+  source "$REPO_ROOT/configs/S2S_R/LLAMA/generic/$DATASET_KEY.sh"
   TRUTHFULQA_FEATURE="$FEATURE_DIR/${MODEL}_layer${LAYER}.npz"
   DATASET_DIR="$EXPERIMENT_RESULT_DIR/$MODEL/$DATASET"
   if [[ "$RUN_EXTRACT" == 1 || ( "$RUN_EXTRACT" == auto && ! -s "$TRUTHFULQA_FEATURE" ) ]]; then
-    run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/S2S_R/extract_features.py "$MODEL" \
+    run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" methods/S2S_R/extract_features.py "$MODEL" \
       --model_dir "$MODEL_DIR" --layer "$LAYER" --save_dir "$FEATURE_DIR" \
       --output_name "$(basename "$TRUTHFULQA_FEATURE")" --batch_size "$EXTRACT_BATCH_SIZE" \
       --device "$DEVICE" --dtype "$DTYPE" --split_seed "$SEED"
@@ -39,7 +39,7 @@ for DATASET_KEY in "${DATASET_KEYS[@]}"; do (
     TRANSFER_CHECKPOINT="$DATASET_DIR/checkpoints/transfer_fold${SOURCE_FOLD}.npz"
     EVAL_JSON="$DATASET_DIR/evaluations/truthfulqa_mean_fold${SOURCE_FOLD}.json"
     if [[ "$RUN_TRAIN" == 1 ]]; then
-      run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/S2S_R/train_predictor.py \
+      run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" methods/S2S_R/train_predictor.py \
         --feature_path "$TRUTHFULQA_FEATURE" --output_path "$SOURCE_CHECKPOINT" \
         --positive_mode "$POSITIVE_MODE" --num_folds 2 --fold_idx "$SOURCE_FOLD" \
         --val_fraction "$VAL_FRACTION" --mlp_hidden "$MLP_HIDDEN" --epochs "$EPOCHS" \
@@ -53,7 +53,7 @@ for DATASET_KEY in "${DATASET_KEYS[@]}"; do (
         --source-fold "$SOURCE_FOLD" --output "$TRANSFER_CHECKPOINT"
     fi
     if [[ "$RUN_EVAL" == 1 ]]; then
-      run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/S2S_R/generic/evaluate_generic.py \
+      run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" methods/S2S_R/generic/evaluate_generic.py \
         --model_name "$MODEL" --model_dir "$MODEL_DIR" --dataset "$DATASET" --layer "$LAYER" \
         --checkpoint_path "$TRANSFER_CHECKPOINT" --weight_kappa "$WEIGHT_KAPPA" --margin "$MARGIN" \
         --method S2S_R --seed "$SEED" --dtype "$DTYPE" --output_path "$EVAL_JSON"

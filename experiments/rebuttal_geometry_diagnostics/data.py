@@ -7,15 +7,15 @@ import numpy as np
 import torch
 from datasets import load_dataset, Dataset, concatenate_datasets
 
-from method.S2S_R.generic.prompts_generic import (
+from methods.S2S_R.generic.prompts_generic import (
     format_boolq_prompt, format_copa_prompt, format_storycloze_prompt,
     format_winogrande_prompt, format_mmlu_prompt,
 )
-from method.S2S_R.generic.utils_generic import MMLU_CATEGORIES
-from method.S2S_R.eval_utils import (
+from methods.S2S_R.generic.utils_generic import MMLU_CATEGORIES
+from methods.S2S_R.eval_utils import (
     get_instruction, load_truthfulqa_mc_dataframe, format_best, split_multi_answer,
 )
-from method.S2S_R.evaluate_predictor import load_components
+from methods.S2S_R.evaluate_predictor import load_components
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = 'llama3.1-8B-Instruct'
@@ -28,7 +28,7 @@ def config(dataset):
     def source(method, names):
         script = 'source "$1"; ' + 'printf "%s\\n" ' + ' '.join('"$' + n + '"' for n in names)
         result = subprocess.check_output(['bash', '-c', script, 'config',
-            str(ROOT / f'hyperparams/{method}/LLAMA/{suffix}')], text=True).splitlines()
+            str(ROOT / f'configs/{method}/LLAMA/{suffix}')], text=True).splitlines()
         return dict(zip(names, map(float, result)))
     dyn = source('S2S_R', ['WEIGHT_KAPPA', 'MARGIN'])
     sph = source('spherical_steering', ['KAPPA', 'ALPHA', 'BETA'])
@@ -66,7 +66,7 @@ def items(dataset, tokenizer):
                 add(format_mmlu_prompt(tokenizer, row['question'], row['choices']), row['choices'], row['answer'])
                 output[-1]['category'] = category
     else:
-        frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'))
+        frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'data/truthfulqa/TruthfulQA.csv'))
         for _, row in frame.iterrows():
             best = format_best(row['Best Answer'])
             true = list(dict.fromkeys([best] + split_multi_answer(row['Correct Answers'])))

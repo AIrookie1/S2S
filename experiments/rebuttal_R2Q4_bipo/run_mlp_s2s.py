@@ -21,7 +21,7 @@ from experiments.rebuttal_R2Q4_bipo.rebuttal_R2Q4_run import (
     tail_model,
     write_json,
 )
-from method.S2S_R.predictor import DirectVectorMLP, fit_dynamic_mlp, load_feature_pairs
+from methods.S2S_R.predictor import DirectVectorMLP, fit_dynamic_mlp, load_feature_pairs
 
 
 def train_fold(feature: Path, folder: Path, split: dict, args) -> DirectVectorMLP:
@@ -145,7 +145,7 @@ def main():
         parameter.requires_grad_(False)
     records = torch.load(args.input / "prefix_cache.pt", weights_only=False, map_location="cpu")
     cache = {tuple(record["ids"].tolist()): record["hidden"] for record in records}
-    frame, _ = load_truthfulqa_mc_dataframe("./TruthfulQA/data/v1/TruthfulQA.csv")
+    frame, _ = load_truthfulqa_mc_dataframe("./data/truthfulqa/TruthfulQA.csv")
     block = model.model.layers[14]
     block_device = model.device
     predictors = [predictor.to(block_device).eval() for predictor in predictors]

@@ -39,18 +39,18 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.S2S_L.steering import get_s2s_l_intervention
-from method.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
-from method.S2S_R.evaluate_predictor import load_components
-from method.S2S_R.evaluate_llm_judge import format_generation_prompt
-from method.S2S_R.evaluate_llm_judge_S2S_R import (
+from methods.S2S_L.steering import get_s2s_l_intervention
+from methods.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
+from methods.S2S_R.evaluate_predictor import load_components
+from methods.S2S_R.evaluate_llm_judge import format_generation_prompt
+from methods.S2S_R.evaluate_llm_judge_S2S_R import (
     _NullContext,
     _model_input_device,
     capture_probe_last_hidden,
     controls_from_cached_hidden,
     fixed_dynamic_controls,
 )
-from method.spherical_steering.steering import get_spherical_intervention
+from methods.spherical_steering.steering import get_spherical_intervention
 
 
 METHOD_ORDER = (

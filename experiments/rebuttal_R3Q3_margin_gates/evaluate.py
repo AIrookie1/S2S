@@ -19,10 +19,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from experiments.rebuttal_R3Q3_candidate_gates.evaluate import validate_splits
-from method.S2S_R.predictor import predict_residual
-from method.S2S_R.evaluate_S2S_R import adaptive_3way_weights, get_s2s_r_intervention, norm
-from method.S2S_R.evaluate_predictor import load_components
-from method.S2S_R.eval_utils import (
+from methods.S2S_R.predictor import predict_residual
+from methods.S2S_R.evaluate_S2S_R import adaptive_3way_weights, get_s2s_r_intervention, norm
+from methods.S2S_R.evaluate_predictor import load_components
+from methods.S2S_R.eval_utils import (
     calculate_scores_zeroshot,
     format_best,
     get_layer_name,
@@ -278,7 +278,7 @@ def main() -> None:
     parser.add_argument("--model_dir", default=__import__("os").environ.get("LLAMA_MODEL_DIR", "models/Meta-Llama-3.1-8B-Instruct"))
     parser.add_argument("--checkpoint_dir", default=str(ROOT / "checkpoints/S2S_R/truthfulqa/llama3.1-8B-Instruct"))
     parser.add_argument("--eval_root", default=str(ROOT / "results/experiment/fig3c_gate_margin/evaluations"))
-    parser.add_argument("--csv_path", default=str(ROOT / "TruthfulQA/data/v1/TruthfulQA.csv"))
+    parser.add_argument("--csv_path", default=str(ROOT / "data/truthfulqa/TruthfulQA.csv"))
     parser.add_argument("--output_dir", required=True)
     parser.add_argument("--folds", type=int, nargs="+", default=[0, 1])
     parser.add_argument("--margins", type=float, nargs="+", default=DEFAULT_MARGINS)

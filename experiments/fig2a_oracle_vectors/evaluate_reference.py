@@ -22,7 +22,7 @@ from experiments.fig2a_oracle_vectors.vector_utils import (  # noqa: E402
     find_answer_rows,
     load_pair_vector_data,
 )
-from method.S2S_R.eval_utils import (  # noqa: E402
+from methods.S2S_R.eval_utils import (  # noqa: E402
     HF_NAMES,
     calculate_scores_zeroshot,
     get_additive_intervention,
@@ -46,7 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--feature_path", required=True)
     parser.add_argument("--fold_idx", type=int, choices=[0,1], default=0)
     parser.add_argument("--model_dir", default=None)
-    parser.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
+    parser.add_argument("--csv_path", default="./data/truthfulqa/TruthfulQA.csv")
     parser.add_argument("--layer", type=int, default=14)
     parser.add_argument(
         "--alpha",

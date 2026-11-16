@@ -49,7 +49,7 @@ def main():
     tokenizer=AutoTokenizer.from_pretrained(location,local_files_only=True)
     records=torch.load(BASE/'prefix_cache.pt',weights_only=False,map_location='cpu')
     cache={tuple(r['ids'].tolist()):r['hidden'] for r in records}
-    frame,_=load_truthfulqa_mc_dataframe(str(ROOT/'TruthfulQA/data/v1/TruthfulQA.csv'))
+    frame,_=load_truthfulqa_mc_dataframe(str(ROOT/'data/truthfulqa/TruthfulQA.csv'))
     fold_rows=[]
     pooled={m:[] for m in config['methods']}
     for fold in (0,1):

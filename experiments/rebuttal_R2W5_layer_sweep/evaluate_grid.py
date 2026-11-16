@@ -15,7 +15,7 @@ from results import SELECTION, cells, file_identity, valid_cell, write_json
 def evaluate_one(model, tokenizer, dataframe, config, layer, hook):
     import torch
     from tqdm import tqdm
-    from method.S2S_R.eval_utils import calculate_scores_zeroshot, format_best, get_layer_name, split_multi_answer
+    from methods.S2S_R.eval_utils import calculate_scores_zeroshot, format_best, get_layer_name, split_multi_answer
     from truthfulqa.models import MC_calcs, set_columns
 
     results = dataframe.copy().reset_index(drop=True)
@@ -69,13 +69,13 @@ def main():
     import numpy as np
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    from method.S2S_L.steering import get_s2s_l_intervention
-    from method.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
-    from method.S2S_R.evaluate_predictor import load_components
-    from method.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, resolve_device, set_seed
+    from methods.S2S_L.steering import get_s2s_l_intervention
+    from methods.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
+    from methods.S2S_R.evaluate_predictor import load_components
+    from methods.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, resolve_device, set_seed
 
     device = resolve_device(config["device"])
-    dataframe, hf_dataset = load_truthfulqa_mc_dataframe(str(ROOT / "TruthfulQA/data/v1/TruthfulQA.csv"))
+    dataframe, hf_dataset = load_truthfulqa_mc_dataframe(str(ROOT / "data/truthfulqa/TruthfulQA.csv"))
     components, frames, test_ids = {}, {}, {}
     for fold, checkpoint in enumerate((args.checkpoint0, args.checkpoint1)):
         data, avg, predictor = load_components(str(checkpoint), device)

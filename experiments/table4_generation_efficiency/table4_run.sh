@@ -2,8 +2,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/hyperparams/S2S_R/LLAMA/truthfulqa.sh"
-source "$REPO_ROOT/script/common.sh"
+source "$REPO_ROOT/configs/S2S_R/LLAMA/truthfulqa.sh"
+source "$REPO_ROOT/scripts/common.sh"
 
 # Paper Table 4 uses the S2S fold-0 held-out questions.
 FOLD_IDX=0

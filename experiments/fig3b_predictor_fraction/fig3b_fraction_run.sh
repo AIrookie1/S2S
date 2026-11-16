@@ -2,7 +2,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/hyperparams/S2S_R/experiments/fig3b_predictor_fraction.sh"
+source "$REPO_ROOT/configs/S2S_R/experiments/fig3b_predictor_fraction.sh"
 GPU="${GPU:-0}"
 source "$REPO_ROOT/experiments/common.sh"
 REUSE_EXISTING="${REUSE_EXISTING:-1}"

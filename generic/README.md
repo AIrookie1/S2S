@@ -1,7 +1,7 @@
 # Generic multiple-choice evaluation
 
 This directory keeps the historical generic dataset entry points. The
-maintained implementations live under `method/*/generic/`.
+maintained implementations live under `methods/*/generic/`.
 
 Supported datasets are:
 
@@ -19,13 +19,13 @@ MC1 scoring pipeline, but applies its standard additive rule:
 h_new = h + alpha * L2S(h)
 ```
 
-The compatibility launcher `generic/script/run_generic_dataset.sh` supports
+The compatibility launcher `generic/scripts/run_generic_dataset.sh` supports
 LLAMA and QWEN. Examples:
 
 ```bash
-METHOD=S2S_R MODEL_FAMILY=LLAMA bash generic/script/run_generic_dataset.sh boolq
-METHOD=L2S_LINEAR MODEL_FAMILY=LLAMA bash generic/script/run_generic_dataset.sh boolq
-METHOD=L2S_LINEAR MODEL_FAMILY=QWEN bash generic/script/run_generic_dataset.sh mmlu_global
+METHOD=S2S_R MODEL_FAMILY=LLAMA bash generic/scripts/run_generic_dataset.sh boolq
+METHOD=L2S_LINEAR MODEL_FAMILY=LLAMA bash generic/scripts/run_generic_dataset.sh boolq
+METHOD=L2S_LINEAR MODEL_FAMILY=QWEN bash generic/scripts/run_generic_dataset.sh mmlu_global
 ```
 
 For L2S-LINEAR, results are written by default to

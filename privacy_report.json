@@ -1,7 +1,0 @@
-{
-  "passed": true,
-  "scanned_files": 453,
-  "history_exported": false,
-  "binary_artifacts_exported": false,
-  "limitation": "Content scan only; account ownership, platform metadata, and recognizable code can still identify authors."
-}

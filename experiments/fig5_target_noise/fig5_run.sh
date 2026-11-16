@@ -6,26 +6,26 @@ cd "$ROOT"
 
 FAMILY="${FAMILY:-LLAMA}"; FAMILY="${FAMILY^^}"
 case "$FAMILY" in LLAMA|QWEN) ;; *) echo "FAMILY must be LLAMA or QWEN" >&2; exit 2;; esac
-source "$ROOT/script/common.sh"
+source "$ROOT/scripts/common.sh"
 
 # L2S defaults.
-source "$ROOT/hyperparams/l2s_linear/$FAMILY/truthfulqa.sh"
+source "$ROOT/configs/l2s_linear/$FAMILY/truthfulqa.sh"
 L2S_MODEL="$MODEL"; L2S_MODEL_DIR="$MODEL_DIR"; L2S_LAYER="$LAYER"; L2S_FOLD="$FOLD_IDX"
 L2S_NUM_FOLDS="$NUM_FOLDS"; L2S_VAL="$VAL_FRACTION"; L2S_HIDDEN="$MLP_HIDDEN"
 L2S_EPOCHS="$EPOCHS"; L2S_BATCH="$BATCH_SIZE"; L2S_LR="$LEARNING_RATE"
 L2S_SEED="$SEED"; L2S_DEVICE="$DEVICE"; L2S_DTYPE="$DTYPE"; L2S_PRESET="$EVAL_PRESET"
 LINEAR_ALPHA="$ALPHA"
 unset ALPHA KAPPA BETA
-source "$ROOT/hyperparams/l2s_slerp/$FAMILY/truthfulqa.sh"
+source "$ROOT/configs/l2s_slerp/$FAMILY/truthfulqa.sh"
 SLERP_KAPPA="$KAPPA"; SLERP_ALPHA="$ALPHA"; SLERP_BETA="$BETA"
 
 # S2S-L-Static defaults.
-source "$ROOT/hyperparams/S2S_L/$FAMILY/truthfulqa.sh"
+source "$ROOT/configs/S2S_L/$FAMILY/truthfulqa.sh"
 S2SL_STRENGTH="$STRENGTH"; S2SL_T="$SLERP_T"
 S2S_POSITIVE_MODE="$POSITIVE_MODE"
 
 # S2S-R defaults.
-source "$ROOT/hyperparams/S2S_R/$FAMILY/truthfulqa.sh"
+source "$ROOT/configs/S2S_R/$FAMILY/truthfulqa.sh"
 S2SR_KAPPA="$WEIGHT_KAPPA"; S2SR_MARGIN="$MARGIN"
 
 MODEL="${MODEL_OVERRIDE:-$L2S_MODEL}"
@@ -110,14 +110,14 @@ for SIGMA in $NOISE_LEVELS; do
   D2CP="$OUT/s2s_l_static.npz"; D3CP="$OUT/s2s_r.npz"
 
   if need_train "$LCP" "$SIGMA"; then
-    "$PYTHON_BIN" method/l2s_linear/train_l2s.py --feature_path "$FEATURE_PATH" --output_path "$LCP" \
+    "$PYTHON_BIN" methods/l2s_linear/train_l2s.py --feature_path "$FEATURE_PATH" --output_path "$LCP" \
       --num_folds "$L2S_NUM_FOLDS" --fold_idx "$FOLD_IDX" --val_fraction "$L2S_VAL" \
       --mlp_hidden "$L2S_HIDDEN" --epochs "$L2S_EPOCHS" --batch_size "$L2S_BATCH" \
       --learning_rate "$L2S_LR" --device "$L2S_DEVICE" --seed "$L2S_SEED" \
       --target_noise_sigma "$SIGMA" --noise_seed "$NOISE_SEED"
   fi
   if need_train "$SCP" "$SIGMA"; then
-    "$PYTHON_BIN" method/l2s_slerp/train_l2s.py --feature_path "$FEATURE_PATH" --output_path "$SCP" \
+    "$PYTHON_BIN" methods/l2s_slerp/train_l2s.py --feature_path "$FEATURE_PATH" --output_path "$SCP" \
       --num_folds "$L2S_NUM_FOLDS" --fold_idx "$FOLD_IDX" --val_fraction "$L2S_VAL" \
       --mlp_hidden "$L2S_HIDDEN" --epochs "$L2S_EPOCHS" --batch_size "$L2S_BATCH" \
       --learning_rate "$L2S_LR" --device "$L2S_DEVICE" --seed "$L2S_SEED" \
@@ -129,7 +129,7 @@ for SIGMA in $NOISE_LEVELS; do
   for SPEC in "S2S_L_Static:$D2CP" "S2S_R:$D3CP"; do
     CP="${SPEC#*:}"
     if need_train "$CP" "$SIGMA"; then
-      "$PYTHON_BIN" method/S2S_R/train_predictor.py --feature_path "$S2S_FEATURE_PATH" --output_path "$CP" \
+      "$PYTHON_BIN" methods/S2S_R/train_predictor.py --feature_path "$S2S_FEATURE_PATH" --output_path "$CP" \
         --positive_mode "$S2S_POSITIVE_MODE" --num_folds "$L2S_NUM_FOLDS" --fold_idx "$FOLD_IDX" \
         --val_fraction "$L2S_VAL" --mlp_hidden "$L2S_HIDDEN" --epochs "$L2S_EPOCHS" \
         --batch_size "$L2S_BATCH" --learning_rate "$L2S_LR" --device "$L2S_DEVICE" \
@@ -147,13 +147,13 @@ for SIGMA in $NOISE_LEVELS; do
     --seed "$L2S_SEED" --preset "$L2S_PRESET" --residual_noise_sigma 0.0 \
     --output_dir "$OUT" --output_stem l2s
 
-  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/S2S_L/evaluate_S2S_L.py "$MODEL" \
+  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" methods/S2S_L/evaluate_S2S_L.py "$MODEL" \
     --checkpoint_path "$D2CP" --model_dir "$MODEL_DIR" --layer "$LAYER" --eval_split test \
     --strength "$S2SL_STRENGTH" --slerp_t "$S2SL_T" --method S2S_L_Static \
     --device "$L2S_DEVICE" --dtype "$L2S_DTYPE" --seed "$L2S_SEED" --preset "$L2S_PRESET" \
     --residual_noise_sigma 0.0 --output_path "$OUT/s2s_l_static.json"
 
-  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/S2S_R/evaluate_S2S_R.py "$MODEL" \
+  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" methods/S2S_R/evaluate_S2S_R.py "$MODEL" \
     --checkpoint_path "$D3CP" --model_dir "$MODEL_DIR" --layer "$LAYER" --eval_split test \
     --weight_kappa "$S2SR_KAPPA" --margin "$S2SR_MARGIN" --method S2S_R \
     --device "$L2S_DEVICE" --dtype "$L2S_DTYPE" --seed "$L2S_SEED" --preset "$L2S_PRESET" \

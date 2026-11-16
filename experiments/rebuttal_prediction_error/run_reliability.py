@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from experiments.fig2bc_l2s_reliability.metrics import rowwise_vector_metrics, aggregate_by_question
 from experiments.rebuttal_prediction_error.rebuttal_prediction_error_run import write_csv
-from method.S2S_R.predictor import DirectVectorMLP
-from method.l2s_linear.model import load_l2s_pairs
+from methods.S2S_R.predictor import DirectVectorMLP
+from methods.l2s_linear.model import load_l2s_pairs
 
 
 def main():
@@ -79,7 +79,7 @@ def main():
     write_csv(output / 'summary.csv', summary)
     (output / 'summary.json').write_text(json.dumps(summary, indent=2, allow_nan=False))
     lines = ['# Direct-MLP diagnostics using the L2S reliability protocol', '',
-        'Reuses method/l2s_linear/model.py:load_l2s_pairs and experiments/fig2bc_l2s_reliability/metrics.py:rowwise_vector_metrics, aggregate_by_question. Target: raw v_T=z_pos_raw-z_neg_raw; stored pair fields take precedence. Direction: mean cosine similarity (higher is better), not angle in degrees. Magnitude: abs(||v_pred||-||v_T||)/||v_T|| (lower is better, dimensionless). Pair metrics are averaged within each question and question rows pooled across folds, exactly as the reliability plot centroid. Zero predictions have cosine 0 and relative norm error 1; near-zero targets are rejected. Existing direct-MLP weights and normalize(h_neg) input rule are retained. MLPs were trained against mean-positive targets; raw-pair diagnostics do not change their training targets. Generic evaluation uses the previously extracted official labeled splits (MMLU: repository balanced 2000-question test subset); TruthfulQA uses existing held-out folds. This evaluates the direct MLP, not a replacement L2S checkpoint.', '',
+        'Reuses methods/l2s_linear/model.py:load_l2s_pairs and experiments/fig2bc_l2s_reliability/metrics.py:rowwise_vector_metrics, aggregate_by_question. Target: raw v_T=z_pos_raw-z_neg_raw; stored pair fields take precedence. Direction: mean cosine similarity (higher is better), not angle in degrees. Magnitude: abs(||v_pred||-||v_T||)/||v_T|| (lower is better, dimensionless). Pair metrics are averaged within each question and question rows pooled across folds, exactly as the reliability plot centroid. Zero predictions have cosine 0 and relative norm error 1; near-zero targets are rejected. Existing direct-MLP weights and normalize(h_neg) input rule are retained. MLPs were trained against mean-positive targets; raw-pair diagnostics do not change their training targets. Generic evaluation uses the previously extracted official labeled splits (MMLU: repository balanced 2000-question test subset); TruthfulQA uses existing held-out folds. This evaluates the direct MLP, not a replacement L2S checkpoint.', '',
         '| Dataset | Layer | Split | Questions | Pairs | Cosine similarity ↑ | Relative norm error ↓ |',
         '|---|---:|---|---:|---:|---:|---:|']
     for r in summary:

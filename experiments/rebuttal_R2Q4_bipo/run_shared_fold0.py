@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM,AutoTokenizer
 from experiments.rebuttal_R2Q4_bipo.rebuttal_R2Q4_run import evaluate,make_hook,load_truthfulqa_mc_dataframe,write_json
-from method.S2S_R.predictor import DirectVectorMLP
+from methods.S2S_R.predictor import DirectVectorMLP
 
 BASE=ROOT/'results/experiment/rebuttal_R2Q4_bipo'
 RETUNED=BASE/'mlp_s2s_retuned'
@@ -87,7 +87,7 @@ def main():
                     tokenizer=AutoTokenizer.from_pretrained(location,local_files_only=True)
                     records=torch.load(BASE/'prefix_cache.pt',weights_only=False,map_location='cpu')
                     cache={tuple(r['ids'].tolist()):r['hidden'] for r in records}
-                    frame,_=load_truthfulqa_mc_dataframe(str(ROOT/'TruthfulQA/data/v1/TruthfulQA.csv'))
+                    frame,_=load_truthfulqa_mc_dataframe(str(ROOT/'data/truthfulqa/TruthfulQA.csv'))
                 device=model.device
                 predictor=load_predictor(BASE/f'fold{fold}/mlp_predictor.npz',split[fold]['train'],device)
                 bipo=torch.load(BASE/f'fold{fold}/bipo.pt',weights_only=False,map_location='cpu')['vector'].to(device)

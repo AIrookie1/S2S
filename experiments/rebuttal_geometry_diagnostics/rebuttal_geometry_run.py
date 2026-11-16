@@ -21,8 +21,8 @@ from experiments.rebuttal_geometry_diagnostics.core import (
 from experiments.rebuttal_geometry_diagnostics.data import (
     MODEL, LAYERS, items, tokens, components, config,
 )
-from method.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
-from method.spherical_steering.steering import get_spherical_intervention
+from methods.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
+from methods.spherical_steering.steering import get_spherical_intervention
 
 
 def process(engine, tokenizer, item, dataset, hp, parts, verify=False, batch_size=4):

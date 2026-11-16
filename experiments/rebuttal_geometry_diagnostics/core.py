@@ -5,8 +5,8 @@ from contextlib import contextmanager
 import torch
 import torch.nn.functional as F
 
-from method.S2S_R.evaluate_S2S_R import adaptive_3way_weights, two_slerp_sym, norm
-from method.spherical_steering.steering import spherical_geometric_logic
+from methods.S2S_R.evaluate_S2S_R import adaptive_3way_weights, two_slerp_sym, norm
+from methods.spherical_steering.steering import spherical_geometric_logic
 
 # Fixed before evaluation. The same weights apply to every answer of a question.
 GRID = ((.8, .1, .1), (.6, .3, .1), (.6, .1, .3),

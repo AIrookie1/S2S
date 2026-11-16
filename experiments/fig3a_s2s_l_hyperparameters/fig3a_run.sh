@@ -2,8 +2,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/hyperparams/S2S_L/experiments/fig3a_s2s_l_hyperparameters.sh"
-source "$REPO_ROOT/script/common.sh"
+source "$REPO_ROOT/configs/S2S_L/experiments/fig3a_s2s_l_hyperparameters.sh"
+source "$REPO_ROOT/scripts/common.sh"
 
 GPU="${GPU:-2}"
 RUN_EXTRACT="${RUN_EXTRACT:-auto}"
@@ -23,7 +23,7 @@ configure_S2S_L_model() {
   local key="${1^^}"
   unset MODEL MODEL_DIR MODEL_LABEL LAYER FOLD_IDX DEFAULT_LAYER DEFAULT_FOLD_IDX NUM_HIDDEN_LAYERS
   case "$key" in
-    LLAMA|QWEN) source "$REPO_ROOT/hyperparams/S2S_L/$key/truthfulqa.sh" ;;
+    LLAMA|QWEN) source "$REPO_ROOT/configs/S2S_L/$key/truthfulqa.sh" ;;
     *) echo "Unknown model: $1 (expected LLAMA or QWEN)" >&2; return 2 ;;
   esac
 }
@@ -37,7 +37,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
 
   if [[ "$RUN_EXTRACT" == 1 || ( "$RUN_EXTRACT" == auto && ! -s "$FEATURE_PATH" ) ]]; then
     mkdir -p "$(dirname "$FEATURE_PATH")"
-    CUDA_VISIBLE_DEVICES="$MODEL_GPU" "$PYTHON_BIN" method/S2S_L/extract_features.py "$MODEL" \
+    CUDA_VISIBLE_DEVICES="$MODEL_GPU" "$PYTHON_BIN" methods/S2S_L/extract_features.py "$MODEL" \
       --model_dir "$MODEL_DIR" --layer "$LAYER" --save_dir "$(dirname "$FEATURE_PATH")" \
       --output_name "$(basename "$FEATURE_PATH")" --batch_size "$EXTRACT_BATCH_SIZE" \
       --device "$DEVICE" --dtype "$DTYPE" --split_seed "$SEED"
@@ -53,7 +53,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
 
     if [[ "$RUN_TRAIN" == 1 || ( "$RUN_TRAIN" == auto && ! -s "$CHECKPOINT_PATH" ) ]]; then
       echo "=== S2S_L train | model=$MODEL fold=$FOLD_IDX ==="
-      CUDA_VISIBLE_DEVICES="$MODEL_GPU" "$PYTHON_BIN" method/S2S_L/train_predictor.py \
+      CUDA_VISIBLE_DEVICES="$MODEL_GPU" "$PYTHON_BIN" methods/S2S_L/train_predictor.py \
         --feature_path "$FEATURE_PATH" --positive_mode "$POSITIVE_MODE" \
         --output_path "$CHECKPOINT_PATH" --num_folds "$NUM_FOLDS" --fold_idx "$FOLD_IDX" \
         --val_fraction "$VAL_FRACTION" --mlp_hidden "$MLP_HIDDEN" --epochs "$EPOCHS" \

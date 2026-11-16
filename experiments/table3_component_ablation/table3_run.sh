@@ -2,8 +2,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/hyperparams/S2S_R/LLAMA/truthfulqa.sh"
-source "$REPO_ROOT/script/common.sh"
+source "$REPO_ROOT/configs/S2S_R/LLAMA/truthfulqa.sh"
+source "$REPO_ROOT/scripts/common.sh"
 
 # Paper Table 3 is intentionally fold 0 only.
 FOLD_IDX="${FOLD_IDX:-0}"
@@ -13,7 +13,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_ROOT/experiment/table3_component_ablation/$MOD
 
 if [[ ! -s "$CHECKPOINT_PATH" ]]; then
   echo "[component-ablation] missing fold-0 S2S-R checkpoint: $CHECKPOINT_PATH" >&2
-  echo "Train it first with: FOLD_IDX=0 bash script/S2S_R/LLAMA/run_S2S_R_train.sh" >&2
+  echo "Train it first with: FOLD_IDX=0 bash scripts/S2S_R/LLAMA/run_S2S_R_train.sh" >&2
   exit 1
 fi
 

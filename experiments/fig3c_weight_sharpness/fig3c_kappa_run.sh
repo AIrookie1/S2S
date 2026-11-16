@@ -2,7 +2,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/hyperparams/S2S_R/experiments/fig3c_weight_sharpness.sh"
+source "$REPO_ROOT/configs/S2S_R/experiments/fig3c_weight_sharpness.sh"
 GPU="${GPU:-1}"
 source "$REPO_ROOT/experiments/common.sh"
 read -r -a MODEL_KEYS <<< "${MODELS:-LLAMA QWEN}"

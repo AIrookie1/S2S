@@ -14,6 +14,9 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from reproducibility.config import load_profile, main_parameters
 MODELS = {
     "llama": ("llama3.1-8B-Instruct", "meta-llama/Llama-3.1-8B-Instruct", 14),
     "qwen": ("Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-7B-Instruct", 19),
@@ -31,12 +34,14 @@ def digest(path):
 
 
 def source_digest():
-    paths = [ROOT / "test.py", *sorted((ROOT / "method").rglob("*.py")),
+    paths = [ROOT / "run_method.py", *sorted((ROOT / "methods").rglob("*.py")),
              *sorted((ROOT / "truthfulqa").rglob("*.py")),
              *sorted((ROOT / "reproducibility").rglob("*.py")),
              *sorted((ROOT / "experiments").rglob("*.py")),
-             *sorted((ROOT / "hyperparams").rglob("*.sh")),
-             ROOT / "TruthfulQA/data/v1/TruthfulQA.csv"]
+             *sorted((ROOT / "configs").rglob("*.sh")),
+             *sorted((ROOT / "configs").rglob("*.json")),
+             *sorted((ROOT / "requirements").glob("*.txt")),
+             ROOT / "data/truthfulqa/TruthfulQA.csv"]
     return hashlib.sha256(json.dumps({str(p.relative_to(ROOT)): digest(p)
                                       for p in paths if p.is_file()}, sort_keys=True).encode()).hexdigest()
 
@@ -44,8 +49,10 @@ def source_digest():
 class Plan:
     def __init__(self, args):
         self.args = args
-        self.name, default_dir, self.layer = MODELS[args.model]
-        self.model_dir = args.model_dir or default_dir
+        self.profile = load_profile(getattr(args, "config", None) or os.environ.get("S2S_CONFIG"), args.model)
+        self.name = self.profile["model_name"]
+        self.layer = self.profile["layer"]
+        self.model_dir = args.model_dir or self.profile["model_dir"]
         self.work = args.work_dir
         self.feature = self.work / "features" / f"{self.name}_layer{self.layer}.npz"
         self.s2s_r_dir = self.work / "checkpoints/S2S_R/truthfulqa" / self.name
@@ -65,7 +72,7 @@ class Plan:
         return [sys.executable, path, *args]
 
     def entry(self, method, script, *args):
-        return self.py("test.py", "--method-dir", method, "--entry-file", script, "--", *args)
+        return self.py("run_method.py", "--method-dir", method, "--entry-file", script, "--", *args)
 
     def s2s(self, fold):
         return self.s2s_r_dir / f"{self.name}_layer{self.layer}_predictor_fold{fold}_mean.npz"
@@ -79,23 +86,24 @@ class Plan:
 
     def prepare(self, l2s=False, prototypes=False, train=True):
         a = self.args
-        self.add(f"extract-{self.name}", self.py("method/S2S_R/extract_features.py", self.name,
+        training = self.profile["training"]
+        self.add(f"extract-{self.name}", self.py("methods/S2S_R/extract_features.py", self.name,
                  "--model_dir", self.model_dir, "--layer", self.layer, "--save_dir", self.feature.parent,
                  "--output_name", self.feature.name, "--device", a.device, "--dtype", a.dtype,
                  "--split_seed", a.seed), [self.feature])
         for f in (a.folds if train else []):
-            shared = ["--feature_path", self.feature, "--num_folds", 2, "--fold_idx", f,
-                      "--val_fraction", 0.5, "--mlp_hidden", 256, "--epochs", a.epochs,
-                      "--batch_size", 256, "--learning_rate", 0.001, "--seed", a.seed,
+            shared = ["--feature_path", self.feature, "--num_folds", training["num_folds"], "--fold_idx", f,
+                      "--val_fraction", training["predictor_fraction"], "--mlp_hidden", training["mlp_hidden"], "--epochs", a.epochs,
+                      "--batch_size", training["batch_size"], "--learning_rate", training["learning_rate"], "--seed", a.seed,
                       "--device", a.device]
-            self.add(f"train-s2s-{self.name}-{f}", self.py("method/S2S_R/train_predictor.py",
-                     *shared, "--positive_mode", "mean", "--output_path", self.s2s(f)), [self.s2s(f)])
+            self.add(f"train-s2s-{self.name}-{f}", self.py("methods/S2S_R/train_predictor.py",
+                     *shared, "--positive_mode", training["positive_mode"], "--output_path", self.s2s(f)), [self.s2s(f)])
             if l2s:
-                self.add(f"train-l2s-{self.name}-{f}", self.py("method/l2s_linear/train_l2s.py",
+                self.add(f"train-l2s-{self.name}-{f}", self.py("methods/l2s_linear/train_l2s.py",
                          *shared, "--output_path", self.l2s(f)), [self.l2s(f)])
         if prototypes:
             outputs = [self.proto_dir / f"{self.feature.stem}_fold{f}.npz" for f in (0, 1)]
-            self.add(f"prototypes-{self.name}", self.py("method/spherical_steering/get_prototypes.py",
+            self.add(f"prototypes-{self.name}", self.py("methods/spherical_steering/get_prototypes.py",
                      "--feature_file", self.feature, "--num_folds", 2, "--save_dir", self.proto_dir), outputs)
 
             self.add(f"additive-vectors-{self.name}", self.py("-m", "reproducibility.prepare_additive",
@@ -111,30 +119,31 @@ class Plan:
         for f in self.args.folds:
             out = self.work / "main" / self.name / f"fold{f}"
             common = self.common(f)
+            settings = main_parameters(self.profile, f)
             for method in ("baseline", "additive", "l2s", "spherical", "s2s_l", "s2s_r"):
                 target = out / f"{method}.json"
                 if method in ("baseline", "additive"):
                     extra = ["--no_intervention"] if method == "baseline" else [
-                        "--vector_source", "v", "--no_normalize_v", "--alpha", 1.0]
+                        "--vector_source", "v", "--no_normalize_v", "--alpha", settings["additive_alpha"]]
                     cmd = self.entry("S2S_R", "eval_utils.py", *common,
                         "--dtype", self.args.dtype, "--prototype_path", self.additive_dir / f"fold{f}.npz",
                         "--eval_split", "test", *extra, "--output_path", target, "--save_details")
                 elif method == "spherical":
-                    alpha, beta = (0.7, -0.15) if self.args.model == "llama" else (0.6, 0.4)
+                    alpha, beta = settings["spherical"]["alpha"], settings["spherical"]["beta"]
                     cmd = self.entry("spherical_steering", "evaluate_mc.py", *common,
-                        "--prototype_path", self.prototype(f), "--kappa", 20, "--alpha", alpha,
+                        "--prototype_path", self.prototype(f), "--kappa", settings["spherical"]["kappa"], "--alpha", alpha,
                         "--beta", beta, "--output_path", target, "--save_details")
                 elif method == "l2s":
                     cmd = self.entry("l2s_linear", "evaluate_mc.py", *common, "--dtype", self.args.dtype,
-                        "--checkpoint_path", self.l2s(f), "--eval_split", "test", "--alpha", (1.4 if self.args.model == "qwen" else 1.0),
+                        "--checkpoint_path", self.l2s(f), "--eval_split", "test", "--alpha", settings["l2s_alpha"],
                         "--output_path", target, "--save_details")
                 elif method == "s2s_l":
                     cmd = self.entry("S2S_L", "evaluate_S2S_L.py", *common, "--dtype", self.args.dtype,
-                        "--checkpoint_path", self.s2s(f), "--method", "S2S_L_Static", "--strength", 3.0,
-                        "--slerp_t", 0.2, "--eval_split", "test", "--output_path", target, "--save_details")
+                        "--checkpoint_path", self.s2s(f), "--method", settings["s2s_l"]["method"], "--strength", settings["s2s_l"]["strength"],
+                        "--slerp_t", settings["s2s_l"]["slerp_t"], "--eval_split", "test", "--output_path", target, "--save_details")
                 else:
                     cmd = self.entry("S2S_R", "evaluate_S2S_R.py", *common, "--dtype", self.args.dtype,
-                        "--checkpoint_path", self.s2s(f), "--weight_kappa", 3, "--margin", (-0.3 if self.args.model == "qwen" and f == 0 else -0.7),
+                        "--checkpoint_path", self.s2s(f), "--weight_kappa", settings["s2s_r"]["weight_kappa"], "--margin", settings["s2s_r"]["margin"],
                         "--eval_split", "test", "--output_path", target, "--save_details")
                 self.add(f"main-{self.name}-{f}-{method}", cmd, [target])
 
@@ -183,10 +192,10 @@ class Plan:
                 else:
                     filename = f"{self.name}_{dataset}_mc1.json"
                 self.add(f"generic-{self.name}-{dataset}-{method}",
-                    ["bash", f"script/{directory}/{family}/generic/run_dataset.sh", dataset],
+                    ["bash", f"scripts/{directory}/{family}/generic/run_dataset.sh", dataset],
                     [Path(env["RESULT_DIR"]) / filename], env)
                 if directory == "S2S_R":
-                    cfg = ROOT / "hyperparams/S2S_R" / family / "generic" / (dataset + ".sh")
+                    cfg = ROOT / "configs/S2S_R" / family / "generic" / (dataset + ".sh")
                     match = re.search(r'LAYER="\$\{LAYER:-(\d+)\}"', cfg.read_text())
                     if not match:
                         raise ValueError("Cannot determine generic layer from " + str(cfg))
@@ -194,7 +203,7 @@ class Plan:
                     ckpt = Path(env["GEN_CHECKPOINT_DIR"]) / f"{self.name}_{dataset}_l{layer}_S2S_R.npz"
                     target = self.work / "generic" / dataset / "baseline" / self.name / "baseline.json"
                     self.add(f"generic-{self.name}-{dataset}-baseline", self.py(
-                        "method/S2S_R/generic/evaluate_generic.py", "--model_name", self.name,
+                        "methods/S2S_R/generic/evaluate_generic.py", "--model_name", self.name,
                         "--model_dir", self.model_dir, "--dataset", dataset, "--layer", layer,
                         "--checkpoint_path", ckpt, "--disable_steering", "--dtype", self.args.dtype,
                         "--seed", self.args.seed, "--output_path", target), [target])
@@ -344,6 +353,7 @@ def main():
     p.add_argument("--model", choices=MODELS, default="llama")
     p.add_argument("--datasets", nargs="+", choices=["boolq", "copa", "storycloze", "mmlu_global", "winogrande"],
                    default=["boolq", "copa", "storycloze", "mmlu_global", "winogrande"])
+    p.add_argument("--config", type=Path, help="Model preset JSON; defaults to configs/reproduction/<model>.json")
     p.add_argument("--model-dir", help="Local model directory, or official Hub ID except for BiPO")
     p.add_argument("--model-root", type=Path)
     p.add_argument("--scaling-models", nargs="+", choices=SCALING, default=list(SCALING[:4]))

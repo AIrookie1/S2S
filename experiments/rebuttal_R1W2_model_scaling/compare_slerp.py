@@ -94,7 +94,7 @@ def worker(name):
     import torch
     from experiments.rebuttal_R1W2_model_scaling.common import load_model
     from experiments.rebuttal_R1W2_model_scaling.rebuttal_R1W2_run import evaluate, make_hook
-    from method.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
+    from methods.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
     torch.set_num_threads(4)
     source = BASE / name / RUNS[name]
     output = OUT / name
@@ -138,7 +138,7 @@ def worker(name):
                             if model is None:
                                 model, tokenizer, _, layers = load_model(config)
                                 block = layers[config['layer']]
-                                frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'))
+                                frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'data/truthfulqa/TruthfulQA.csv'))
                             hook = make_hook('s2s_l', params, source / f'fold{fold}', block)
                             metrics, details = evaluate(model, tokenizer, block, frame, split['dev'], hook, config)
                             candidate = dict(parameters=params, metrics=metrics, details=details)
@@ -163,7 +163,7 @@ def worker(name):
                     if model is None:
                         model, tokenizer, _, layers = load_model(config)
                         block = layers[config['layer']]
-                        frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'))
+                        frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'data/truthfulqa/TruthfulQA.csv'))
                     hook = make_hook('s2s_l', params, source / f'fold{fold}', block)
                     metrics, details = evaluate(model, tokenizer, block, frame, split['test'], hook, config)
                     report = dict(fold=fold, method='s2s_l', parameters=params, question_ids=split['test'], metrics=metrics, details=details)

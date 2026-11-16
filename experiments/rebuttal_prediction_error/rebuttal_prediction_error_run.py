@@ -15,7 +15,7 @@ import torch.nn.functional as F
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from method.S2S_R.predictor import DirectVectorMLP, load_feature_pairs
+from methods.S2S_R.predictor import DirectVectorMLP, load_feature_pairs
 
 MODEL = "llama3.1-8B-Instruct"
 LAYERS = {"boolq": 12, "copa": 16, "storycloze": 27,
@@ -142,7 +142,7 @@ def main():
             if not ckpt.exists():
                 print(f"Training {dataset}, fold {fold}; {args.epochs} epochs", flush=True)
                 with ckpt.with_suffix(".log").open("w") as log:
-                    subprocess.run([sys.executable, str(ROOT / "method/S2S_R/train_predictor.py"),
+                    subprocess.run([sys.executable, str(ROOT / "methods/S2S_R/train_predictor.py"),
                         "--feature_path", str(feature), "--output_path", str(ckpt),
                         "--num_folds", "2", "--fold_idx", str(fold), "--val_fraction", "0.5",
                         "--mlp_hidden", "256", "--epochs", str(args.epochs), "--batch_size", "256",

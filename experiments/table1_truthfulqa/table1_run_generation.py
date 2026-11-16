@@ -4,30 +4,32 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from reproducibility.run import Plan
+from reproducibility.config import main_parameters
 
 
 def build_jobs(a):
     plan=Plan(a);jobs=[]
     for fold in a.folds:
+        settings=main_parameters(plan.profile, fold)
         for method in a.methods:
             out=a.work_dir/'table1_generation'/plan.name/f'fold{fold}'/method
             common=[plan.name,'--model_dir',a.model_dir,'--layer',str(plan.layer),
                 '--truth_judge_path',a.truth_judge_dir,'--info_judge_path',a.info_judge_dir,'--max_new_tokens','50',
                 '--preset','null']
             if method in ('baseline','s2s_l','s2s_r'):
-                file='method/S2S_L/evaluate_llm_judge_S2S_L.py' if method=='s2s_l' else 'method/S2S_R/evaluate_llm_judge_S2S_R.py'
+                file='methods/S2S_L/evaluate_llm_judge_S2S_L.py' if method=='s2s_l' else 'methods/S2S_R/evaluate_llm_judge_S2S_R.py'
                 args=[*common,'--checkpoint_path',str(plan.s2s(fold)),'--output_dir',str(out)]
-                if method=='s2s_l':args+=['--strength','3','--slerp_t','.2']
-                else:args+=['--weight_kappa','3','--margin',str(-.3 if a.model=='qwen' and fold==0 else -.7)]
+                if method=='s2s_l':args+=['--strength',str(settings['s2s_l']['strength']),'--slerp_t',str(settings['s2s_l']['slerp_t'])]
+                else:args+=['--weight_kappa',str(settings['s2s_r']['weight_kappa']),'--margin',str(settings['s2s_r']['margin'])]
                 if method=='baseline':args+=['--disable_steering']
             elif method=='l2s':
-                file='method/l2s_linear/evaluate_llm_judge.py'
-                args=[*common,'--checkpoint_path',str(plan.l2s(fold)),'--alpha',str(1.4 if a.model=='qwen' else 1.),
+                file='methods/l2s_linear/evaluate_llm_judge.py'
+                args=[*common,'--checkpoint_path',str(plan.l2s(fold)),'--alpha',str(settings['l2s_alpha']),
                       '--output_dir',str(out)]
             else:
-                file='method/spherical_steering/evaluate_llm_judge.py'
-                alpha,beta=(.7,-.15) if a.model=='llama' else (.6,.4)
-                args=[*common,'--prototype_path',str(plan.prototype(fold)),'--kappa','20',
+                file='methods/spherical_steering/evaluate_llm_judge.py'
+                alpha,beta=settings['spherical']['alpha'],settings['spherical']['beta']
+                args=[*common,'--prototype_path',str(plan.prototype(fold)),'--kappa',str(settings['spherical']['kappa']),
                       '--alpha',str(alpha),'--beta',str(beta),'--output_dir',str(out)]
             jobs.append(dict(method=method,fold=fold,command=[sys.executable,file,*args]))
     return jobs

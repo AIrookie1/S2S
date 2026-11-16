@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 cd "$REPO_ROOT"
 # Both methods use the same direct-vector MLP training configuration.
 set -a
-source "$REPO_ROOT/hyperparams/S2S_R/LLAMA/truthfulqa.sh"
+source "$REPO_ROOT/configs/S2S_R/LLAMA/truthfulqa.sh"
 set +a
 # Keep orchestration in this shell: Python sources participate in cache hashes.
 # These subsets of the original grid can reuse already completed evaluations.

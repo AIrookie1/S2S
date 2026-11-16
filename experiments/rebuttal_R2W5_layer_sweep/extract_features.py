@@ -14,7 +14,7 @@ def main():
     import torch
     from tqdm import tqdm
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    from method.S2S_R.data import get_truthfulqa_data
+    from methods.S2S_R.data import get_truthfulqa_data
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True)

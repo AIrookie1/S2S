@@ -2,7 +2,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/script/common.sh"
+source "$REPO_ROOT/scripts/common.sh"
 OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_ROOT/experiment/fig3a_s2s_l_hyperparameters}"
 SUMMARY_DIR="${SUMMARY_DIR:-$OUTPUT_DIR/summaries}"
 FIGURE_DIR="${FIGURE_DIR:-$OUTPUT_DIR/figures}"

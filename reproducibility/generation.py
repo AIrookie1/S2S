@@ -38,7 +38,7 @@ def read_prompts(path):
 def generate(model, tokenizer, prompt, max_new_tokens, hook=None, block=None,
              predictor=None, controls=None, eos_ids=()):
     import torch
-    from method.S2S_R.evaluate_llm_judge_S2S_R import fixed_dynamic_controls
+    from methods.S2S_R.evaluate_llm_judge_S2S_R import fixed_dynamic_controls
     ids = tokenizer(prompt, return_tensors="pt").input_ids.to(model.get_input_embeddings().weight.device)
     emitted = []
     reason = "length"
@@ -120,12 +120,12 @@ def main():
     import numpy as np
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    from method.S2S_R.evaluate_predictor import load_components
-    from method.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
-    from method.S2S_L.steering import get_s2s_l_intervention
-    from method.l2s_linear.model import load_l2s_checkpoint
-    from method.l2s_linear.steering import get_l2s_linear_intervention
-    from method.S2S_R.evaluate_llm_judge_S2S_R import capture_probe_last_hidden, controls_from_cached_hidden
+    from methods.S2S_R.evaluate_predictor import load_components
+    from methods.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
+    from methods.S2S_L.steering import get_s2s_l_intervention
+    from methods.l2s_linear.model import load_l2s_checkpoint
+    from methods.l2s_linear.steering import get_l2s_linear_intervention
+    from methods.S2S_R.evaluate_llm_judge_S2S_R import capture_probe_last_hidden, controls_from_cached_hidden
     from experiments.rebuttal_R1W2_model_scaling.common import decoder_layers
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but unavailable")
@@ -144,7 +144,7 @@ def main():
                   methods=["baseline", "l2s", "s2s_l", "s2s_r"] + (["spherical"] if args.spherical_prototype else []),
                   spherical_sha256=fingerprint(args.spherical_prototype) if args.spherical_prototype else None,
                   token_count="emitted tokens including terminal EOS; limit hit only when EOS did not stop generation",
-                  source_sha256={str(x.relative_to(ROOT)):fingerprint(x) for folder in ("method", "reproducibility")
+                  source_sha256={str(x.relative_to(ROOT)):fingerprint(x) for folder in ("methods", "reproducibility")
                                  for x in sorted((ROOT / folder).rglob("*.py"))},
                   versions={name: importlib.metadata.version(name) for name in ("torch", "transformers", "numpy")})
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -172,7 +172,7 @@ def main():
                  s2s_r=get_s2s_r_intervention(average, predictor, weight_kappa=args.weight_kappa,
                                                   margin=args.margin))
     if args.spherical_prototype:
-        from method.spherical_steering.steering import get_spherical_intervention
+        from methods.spherical_steering.steering import get_spherical_intervention
         with np.load(args.spherical_prototype, allow_pickle=False) as proto:
             if set(int(q) for q in proto['test_q_indices']) != set(splits['s2s']['test_q_indices']):
                 raise ValueError('Spherical and S2S checkpoints have different test question IDs')

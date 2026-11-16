@@ -51,7 +51,7 @@ from experiments.fig2bc_l2s_reliability.metrics import (
     mean_vector_from_questions,
     rowwise_vector_metrics,
 )
-from method.S2S_R.eval_utils import (
+from methods.S2S_R.eval_utils import (
     HF_NAMES,
     calculate_scores_zeroshot,
     format_best,
@@ -62,10 +62,10 @@ from method.S2S_R.eval_utils import (
     set_seed,
     split_multi_answer,
 )
-from method.l2s_linear.model import load_l2s_checkpoint, load_l2s_pairs
+from methods.l2s_linear.model import load_l2s_checkpoint, load_l2s_pairs
 from experiments.fig2bc_l2s_reliability.spherical_adapter import get_l2s_spherical_intervention
-from method.l2s_linear.steering import get_l2s_linear_intervention
-from method.spherical_steering.steering import get_spherical_intervention
+from methods.l2s_linear.steering import get_l2s_linear_intervention
+from methods.spherical_steering.steering import get_spherical_intervention
 from truthfulqa.models import MC_calcs, set_columns
 
 
@@ -110,7 +110,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--folds", type=int, nargs="+", default=[0, 1])
     p.add_argument("--num_folds", type=int, default=2)
     p.add_argument("--model_dir", default=None)
-    p.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
+    p.add_argument("--csv_path", default="./data/truthfulqa/TruthfulQA.csv")
     p.add_argument(
         "--layer",
         type=int,

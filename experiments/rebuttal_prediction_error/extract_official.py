@@ -16,10 +16,10 @@ from tqdm import tqdm
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from experiments.rebuttal_prediction_error.rebuttal_prediction_error_run import LAYERS, MODEL
-from method.S2S_R.generic.prompts_generic import (
+from methods.S2S_R.generic.prompts_generic import (
     append_option, format_boolq_prompt, format_copa_prompt,
 )
-from method.S2S_R.generic.utils_generic import get_dataset_data, set_seed
+from methods.S2S_R.generic.utils_generic import get_dataset_data, set_seed
 
 SPLITS = {"boolq": "validation", "copa": "validation", "storycloze": "eval",
           "winogrande": "validation", "mmlu_global": "test_category_rows_500_1000"}

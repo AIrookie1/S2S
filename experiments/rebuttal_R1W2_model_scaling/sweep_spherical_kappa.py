@@ -18,11 +18,11 @@ def main():
     config['output_dir'] = str(output)
     output.mkdir(parents=True, exist_ok=True)
     import torch
-    from method.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
+    from methods.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
     torch.set_num_threads(4); set_seed(config['seed'])
     model, tokenizer, _, layers = load_model(config)
     block = layers[config['layer']]
-    frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'))
+    frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'data/truthfulqa/TruthfulQA.csv'))
     grid = [dict(kappa=k, alpha=a, beta=b)
             for k in (1.0, 3.0, 5.0, 10.0, 20.0, 50.0)
             for a in (0.15, 0.3, 0.6) for b in (0.1, 0.4)]

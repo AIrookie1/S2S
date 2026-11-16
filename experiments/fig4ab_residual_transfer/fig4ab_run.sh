@@ -16,7 +16,7 @@ esac
 
 case "$METHOD" in
   S2S_R)
-    source "$REPO_ROOT/hyperparams/S2S_R/$FAMILY/truthfulqa.sh"
+    source "$REPO_ROOT/configs/S2S_R/$FAMILY/truthfulqa.sh"
     CHECKPOINT_METHOD_DIR="S2S_R"
     METHOD_WEIGHT_KAPPA="${WEIGHT_KAPPA:-3}"
     METHOD_MARGIN="${MARGIN:--0.7}"
@@ -26,7 +26,7 @@ case "$METHOD" in
     METHOD_SLERP_T="${SLERP_T:-0.2}"
     ;;
   S2S_L_Static)
-    source "$REPO_ROOT/hyperparams/S2S_L/$FAMILY/truthfulqa.sh"
+    source "$REPO_ROOT/configs/S2S_L/$FAMILY/truthfulqa.sh"
     CHECKPOINT_METHOD_DIR="S2S_L"
     METHOD_STRENGTH="${STRENGTH}"
     METHOD_SLERP_T="${SLERP_T}"
@@ -40,14 +40,14 @@ case "$METHOD" in
     ;;
 esac
 
-source "$REPO_ROOT/script/common.sh"
+source "$REPO_ROOT/scripts/common.sh"
 
 # S2S-R keeps the released cross-fitted Spherical-Steering mean-only baseline.
 # S2S-L-Static instead uses standard linear additive mean steering
 # h <- h + strength * v_avg, so it has no spherical prototype dependency.
 SPHERICAL_PROTOTYPE_PATHS=()
 if [[ "$METHOD" == "S2S_R" ]]; then
-  SPHERICAL_CONFIG="$REPO_ROOT/hyperparams/spherical_steering/$FAMILY/truthfulqa.sh"
+  SPHERICAL_CONFIG="$REPO_ROOT/configs/spherical_steering/$FAMILY/truthfulqa.sh"
   mapfile -t _SPHERICAL_DEFAULTS < <(
     env -u MODEL -u MODEL_DIR -u MODEL_LABEL -u LAYER -u KAPPA -u ALPHA -u BETA -u NUM_FOLDS \
       bash -c 'source "$1"; printf "%s\n" "$MODEL" "$MODEL_DIR" "$LAYER" "$KAPPA" "$ALPHA" "$BETA" "$NUM_FOLDS"' \
@@ -102,8 +102,8 @@ if [[ "$PLOT_ONLY" != 1 ]]; then
       if [[ ! -s "$prototype_path" ]]; then
         echo "[residual-analysis] missing Spherical-Steering prototype: $prototype_path" >&2
         echo "[hint] Generate all spherical folds first, e.g.:" >&2
-        echo "       bash script/spherical_steering/$FAMILY/extract_features.sh" >&2
-        echo "       bash script/spherical_steering/$FAMILY/compute_prototypes.sh" >&2
+        echo "       bash scripts/spherical_steering/$FAMILY/extract_features.sh" >&2
+        echo "       bash scripts/spherical_steering/$FAMILY/compute_prototypes.sh" >&2
         exit 1
       fi
     done

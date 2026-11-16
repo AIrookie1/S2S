@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Table 3: component ablation for S2S-R on TruthfulQA MC.
 
-This experiment intentionally lives outside ``method/`` so the released method
+This experiment intentionally lives outside ``methods/`` so the released method
 implementation remains unchanged.  The full row delegates to the current
 ``get_s2s_r_intervention`` hook verbatim; the ablated rows reuse the
 same current primitives and checkpoint.
@@ -44,17 +44,17 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.S2S_R.predictor import predict_residual
-from method.S2S_L.steering import slerp as stable_single_slerp
-from method.S2S_R.evaluate_predictor import load_components
-from method.S2S_R.evaluate_S2S_R import (
+from methods.S2S_R.predictor import predict_residual
+from methods.S2S_L.steering import slerp as stable_single_slerp
+from methods.S2S_R.evaluate_predictor import load_components
+from methods.S2S_R.evaluate_S2S_R import (
     adaptive_3way_weights,
     get_s2s_r_intervention,
     norm,
     slerp,
     two_slerp_sym,
 )
-from method.S2S_R.eval_utils import (
+from methods.S2S_R.eval_utils import (
     HF_NAMES,
     calculate_scores_fewshot,
     calculate_scores_zeroshot,
@@ -425,7 +425,7 @@ def main() -> None:
     parser.add_argument("model_name", nargs="?", default="llama3.1-8B-Instruct")
     parser.add_argument("--model_dir", default=None)
     parser.add_argument("--checkpoint_path", required=True)
-    parser.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
+    parser.add_argument("--csv_path", default="./data/truthfulqa/TruthfulQA.csv")
     parser.add_argument("--layer", type=int, default=14)
     parser.add_argument("--expected_fold", type=int, default=0)
     parser.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
@@ -523,8 +523,8 @@ def main() -> None:
             "csv_sha256": hashlib.sha256(Path(args.csv_path).read_bytes()).hexdigest(),
             "code_sha256": hashlib.sha256(b"".join(p.read_bytes() for p in (
                 Path(__file__), ROOT / "experiments/table3_component_ablation/vavg_grid.py",
-                ROOT / "method/S2S_R/evaluate_S2S_R.py",
-                ROOT / "method/S2S_L/steering.py", ROOT / "method/S2S_R/eval_utils.py",
+                ROOT / "methods/S2S_R/evaluate_S2S_R.py",
+                ROOT / "methods/S2S_L/steering.py", ROOT / "methods/S2S_R/eval_utils.py",
             ))).hexdigest(),
             "seed": args.seed, "device": str(device), "dtype": args.dtype,
             "few_shot": args.few_shot, "preset": args.preset,
@@ -595,7 +595,7 @@ def main() -> None:
                 "beta=b1+b2, gamma=0; SLERP(X,V,beta), restore ||h||; "
                 "steer iff beta > alpha + margin; no MLP or residual"
             ),
-            "full_row": "delegates to current method/S2S_R/evaluate_S2S_R.py",
+            "full_row": "delegates to current methods/S2S_R/evaluate_S2S_R.py",
         },
     }
     _write_outputs(rows, args.output_dir, metadata)

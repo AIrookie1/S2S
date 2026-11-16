@@ -46,7 +46,7 @@ def main():
             if not ckpt.exists():
                 print(f"Training missing production MLP: {dataset}", flush=True)
                 with ckpt.with_suffix(".log").open("w") as log:
-                    subprocess.run([sys.executable, str(ROOT / "method/S2S_R/train_predictor.py"),
+                    subprocess.run([sys.executable, str(ROOT / "methods/S2S_R/train_predictor.py"),
                         "--feature_path", str(feature), "--output_path", str(ckpt),
                         "--num_folds", "1", "--fold_idx", "0", "--val_fraction", "0.5",
                         "--mlp_hidden", "256", "--epochs", "2000", "--batch_size", "256",

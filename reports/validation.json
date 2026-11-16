@@ -1,0 +1,41 @@
+{
+  "status": "passed_cpu_and_interface_checks",
+  "date": "2026-11-16",
+  "main_cpu_tests": 132,
+  "scaling_cpu_tests": 9,
+  "total_cpu_tests": 141,
+  "dependency_free_interface_tests": 44,
+  "optional_ml_checks_skipped_in_dependency_free_environment": 5,
+  "registered_experiments": 34,
+  "runnable_cli_routes": 33,
+  "native_python_argument_sets": 139,
+  "generic_shell_dry_runs": 40,
+  "python_files_parsed": 195,
+  "shell_scripts_parsed": 221,
+  "missing_documentation_links": 0,
+  "archived_metric_records_preserved": 666,
+  "data_snapshot_sha256": "f9bd9e859cc102cb1f647f1064da7e009be752c416845cf9fa56e6eaae403a7d",
+  "dependency_pins_unchanged": true,
+  "core_mathematical_functions_unchanged": 12,
+  "full_gpu_experiments": false,
+  "original_mmsafe_replication": false,
+  "missing_external_inputs": [
+    "original_MMsafe_prompts_and_judge",
+    "original_LoFiT_LoReFT_implementations_and_vector_artifacts"
+  ],
+  "notes": [
+    "Main/scaling environments are tested separately.",
+    "Source organization and run orchestration changed; mathematical steering functions and archived metrics did not."
+  ],
+  "public_plot_stages": 5,
+  "native_geometry_sampling_seed_preserved": 20261111,
+  "predictor_fraction_seed_grid_preserved": [
+    42,
+    123,
+    0
+  ],
+  "paired_plotting_after_model_runs": true,
+  "runnable_routes": 33,
+  "plot_stages": 5,
+  "native_argument_sets": 139
+}

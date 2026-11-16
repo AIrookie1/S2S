@@ -125,7 +125,7 @@ def worker(name):
     import torch
     from experiments.rebuttal_R1W2_model_scaling.common import load_model
     from experiments.rebuttal_R1W2_model_scaling.rebuttal_R1W2_run import evaluate, make_hook
-    from method.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
+    from methods.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
     torch.set_num_threads(4)
     source, output = BASE / name / RUNS[name], OUT / name
     config = read(source / 'run_config.json')
@@ -136,12 +136,12 @@ def worker(name):
     manifest = dict(source_dir=str(source), source_config=config, grid=expanded_grid(),
                     selection='independent_fold_dev_MC1_then_MC2_then_grid_order',
                     hashes={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
-                            for p in [Path(__file__), ROOT / 'method/spherical_steering/steering.py',
+                            for p in [Path(__file__), ROOT / 'methods/spherical_steering/steering.py',
                                       ROOT / 'experiments/rebuttal_R1W2_model_scaling/rebuttal_R1W2_run.py',
                                       ROOT / 'experiments/rebuttal_R1W2_model_scaling/common.py',
-                                      ROOT / 'method/S2S_R/eval_utils.py',
+                                      ROOT / 'methods/S2S_R/eval_utils.py',
                                       ROOT / 'truthfulqa/models.py',
-                                      ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv',
+                                      ROOT / 'data/truthfulqa/TruthfulQA.csv',
                                       *[source / f'fold{f}' / filename for f in (0, 1)
                                         for filename in ('geometry.npz', 'split.json')]]})
     output.mkdir(parents=True, exist_ok=True)
@@ -166,7 +166,7 @@ def worker(name):
             write_json(output / 'runtime.json', dict(model_class=type(model).__name__, layer_path=layer_path,
                        devices={str(k): str(v) for k, v in getattr(model, 'hf_device_map', {}).items()},
                        torch=torch.__version__, cuda_visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES')))
-            frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'))
+            frame, _ = load_truthfulqa_mc_dataframe(str(ROOT / 'data/truthfulqa/TruthfulQA.csv'))
         hook = make_hook('spherical', params, source / f'fold{fold}', block)
         metrics, details = evaluate(model, tokenizer, block, frame, ids, hook, config)
         return dict(parameters=params, metrics=metrics, details=details)

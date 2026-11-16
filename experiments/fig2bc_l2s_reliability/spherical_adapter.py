@@ -1,6 +1,6 @@
 """Input-dependent prototypes using the unchanged native spherical transform."""
 import torch
-from method.spherical_steering.steering import spherical_geometric_logic
+from methods.spherical_steering.steering import spherical_geometric_logic
 
 
 def get_l2s_spherical_intervention(mlp, *, kappa=20.0, alpha=0.15, beta=0.1, stats=None):

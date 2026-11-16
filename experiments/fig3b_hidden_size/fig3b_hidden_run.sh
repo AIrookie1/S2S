@@ -2,7 +2,7 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-source "$REPO_ROOT/hyperparams/S2S_R/experiments/fig3b_hidden_size.sh"
+source "$REPO_ROOT/configs/S2S_R/experiments/fig3b_hidden_size.sh"
 GPU="${GPU:-2}"
 BASE_GPU="$GPU"
 source "$REPO_ROOT/experiments/common.sh"
@@ -53,7 +53,7 @@ for MODEL_KEY in "${MODEL_KEYS[@]}"; do
         # Call the S2S_R trainer directly so this experiment never depends on
         # an older common.sh helper that may ignore the hidden-size argument.
         run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" \
-          method/S2S_R/train_predictor.py \
+          methods/S2S_R/train_predictor.py \
           --feature_path "$FEATURE_PATH" --positive_mode "$POSITIVE_MODE" \
           --output_path "$CHECKPOINT" --num_folds "$NUM_FOLDS" \
           --fold_idx "$FOLD_IDX" --val_fraction "$VAL_FRACTION" \

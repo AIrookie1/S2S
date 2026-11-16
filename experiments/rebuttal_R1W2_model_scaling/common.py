@@ -51,10 +51,10 @@ def model_identity(location, repo, revision):
 
 def source_identity():
     files = [*Path(__file__).parent.glob('*.py')]
-    for directory in ('method/S2S_R', 'method/l2s_linear', 'method/spherical_steering'):
+    for directory in ('methods/S2S_R', 'methods/l2s_linear', 'methods/spherical_steering'):
         files.extend((ROOT / directory).glob('*.py'))
-    files.extend([ROOT / 'method/inference_residual_noise.py', ROOT / 'truthfulqa/models.py',
-                  ROOT / 'truthfulqa/utilities.py', ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'])
+    files.extend([ROOT / 'methods/inference_residual_noise.py', ROOT / 'truthfulqa/models.py',
+                  ROOT / 'truthfulqa/utilities.py', ROOT / 'data/truthfulqa/TruthfulQA.csv'])
     return fingerprint({str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                         for p in sorted(files)})
 

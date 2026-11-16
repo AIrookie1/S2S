@@ -61,15 +61,15 @@ from experiments.fig4ab_residual_transfer.metrics import (
     equal_count_bins,
     row_normalize,
 )
-from method.S2S_R.predictor import predict_residual
-from method.S2S_R.evaluate_S2S_R import (
+from methods.S2S_R.predictor import predict_residual
+from methods.S2S_R.evaluate_S2S_R import (
     adaptive_3way_weights,
     norm,
     two_slerp_sym,
 )
-from method.S2S_R.evaluate_predictor import load_components
-from method.S2S_L.steering import slerp as S2S_L_slerp
-from method.S2S_R.eval_utils import (
+from methods.S2S_R.evaluate_predictor import load_components
+from methods.S2S_L.steering import slerp as S2S_L_slerp
+from methods.S2S_R.eval_utils import (
     HF_NAMES,
     format_best,
     get_additive_intervention,
@@ -80,7 +80,7 @@ from method.S2S_R.eval_utils import (
     set_seed,
     split_multi_answer,
 )
-from method.spherical_steering.steering import (
+from methods.spherical_steering.steering import (
     get_spherical_intervention,
     spherical_geometric_logic,
 )
@@ -162,7 +162,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("model_name")
     p.add_argument("--checkpoint_path", required=True)
     p.add_argument("--model_dir", default=None)
-    p.add_argument("--csv_path", default="./TruthfulQA/data/v1/TruthfulQA.csv")
+    p.add_argument("--csv_path", default="./data/truthfulqa/TruthfulQA.csv")
     p.add_argument("--layer", type=int, default=14)
     p.add_argument("--eval_split", choices=["test", "train", "all"], default="test")
     p.add_argument("--expected_fold", type=int, default=None)
@@ -1158,7 +1158,7 @@ def get_dynamic_residual_intervention(
     Predicted uses the normal S2S-R residual.  Shuffled and Oracle replace that
     residual *before* ``adaptive_3way_weights`` and therefore recompute
     alpha/beta/gamma and the margin gate from their own direction.  Mean-only
-    is intentionally not handled here; it uses ``method/spherical_steering``.
+    is intentionally not handled here; it uses ``methods/spherical_steering``.
     """
     if condition not in CONDITION_ORDER:
         raise ValueError(f"Unknown residual condition: {condition}")
@@ -1283,7 +1283,7 @@ def get_static_s2s_l_residual_intervention(
     """Build the released S2S-L-Static additive-steering hook for residual swaps.
 
     Only the residual *direction* is swapped.  The current recipient sample
-    always supplies ``||v_hat||`` exactly as in ``method/S2S_L/steering.py``:
+    always supplies ``||v_hat||`` exactly as in ``methods/S2S_L/steering.py``:
 
         D = SLERP(normalize(v_avg), active_residual, slerp_t)
         h_new = h + strength * ||v_hat_recipient|| * D
@@ -2039,8 +2039,8 @@ def main() -> None:
             "oracle_residual": "normalize(oracle_correction - v_avg)",
             "panel_a_population": "held-out incorrect-answer candidates; averaged within question for inference",
             "mean_only": (
-                "S2S_R: released method/spherical_steering baseline using "
-                "hyperparams/spherical_steering, cross-fitted by question. "
+                "S2S_R: released methods/spherical_steering baseline using "
+                "configs/spherical_steering, cross-fitted by question. "
                 "S2S_L_Static: standard linear additive mean steering "
                 "h_new = h + strength * v_avg using the S2S_L strength."
             ),
@@ -2050,7 +2050,7 @@ def main() -> None:
                 "from the active residual. For S2S_L_Static, shuffled/cross-category-cosine-nearest/"
                 "oracle replace only the residual direction; "
                 "the recipient sample keeps its own predicted-vector magnitude and the method's "
-                "fixed strength/slerp_t are used exactly as in method/S2S_L/steering.py."
+                "fixed strength/slerp_t are used exactly as in methods/S2S_L/steering.py."
             ),
             "panel_c_gain": (
                 "angle(method-family mean-only edited last-token direction, nearest-positive truthful direction) - "

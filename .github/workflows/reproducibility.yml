@@ -1,0 +1,28 @@
+name: Reproducibility checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  source-and-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Check lightweight source and configuration tests
+        run: python -m unittest discover -s tests/reproducibility -v
+      - name: Validate public experiment plans
+        run: |
+          python -m reproducibility list
+          python -m reproducibility run table1 --model llama --dry-run
+          python -m reproducibility run r3-mean-control --model qwen --dry-run
+      - name: Compile Python sources
+        run: python -m compileall -q methods generic experiments reproducibility tools truthfulqa tests
+      - name: Build and inspect anonymous artifact
+        run: |
+          python -m reproducibility export --output dist/s2s-anonymous
+          python -m reproducibility verify dist/s2s-anonymous --strict
+# Full GPU benchmarks need separately provisioned model weights and datasets.

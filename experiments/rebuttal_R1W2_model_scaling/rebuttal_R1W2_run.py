@@ -74,7 +74,7 @@ def prepare_features(model, tokenizer, block, config, output):
     import numpy as np
     import torch
     from tqdm import tqdm
-    from method.S2S_R.data import get_truthfulqa_data
+    from methods.S2S_R.data import get_truthfulqa_data
     data = get_truthfulqa_data(style='standard')
     keep = data['q_indices'] < 12 if config['smoke'] else np.ones(len(data['labels']), dtype=bool)
     values = []
@@ -108,7 +108,7 @@ def prepare_features(model, tokenizer, block, config, output):
 
 def prepare_fold(feature, config, fold, folder):
     import numpy as np
-    from method.l2s_linear.model import split_like_s2s_r
+    from methods.l2s_linear.model import split_like_s2s_r
     folder.mkdir(parents=True, exist_ok=True)
     with np.load(feature, allow_pickle=False) as file:
         fields = {key: file[key] for key in file.files}
@@ -133,9 +133,9 @@ def prepare_fold(feature, config, fold, folder):
     write_json(folder / 'split.json', split_record)
     train_feature = folder / 'training_features.npz'
     np.savez_compressed(train_feature, **fields, **metadata)
-    for method, script in [('l2s', 'method/l2s_linear/train_l2s.py'),
-                           ('s2s_l', 'method/S2S_R/train_predictor.py'),
-                           ('s2s_r', 'method/S2S_R/train_predictor.py')]:
+    for method, script in [('l2s', 'methods/l2s_linear/train_l2s.py'),
+                           ('s2s_l', 'methods/S2S_R/train_predictor.py'),
+                           ('s2s_r', 'methods/S2S_R/train_predictor.py')]:
         checkpoint = folder / ('s2s.npz' if method == 's2s_r' else f'{method}.npz')
         if checkpoint.exists():
             try:
@@ -171,12 +171,12 @@ def prepare_fold(feature, config, fold, folder):
 def make_hook(method, parameters, folder, block):
     import numpy as np
     import torch
-    from method.S2S_R.eval_utils import get_additive_intervention
-    from method.spherical_steering.steering import get_spherical_intervention
-    from method.l2s_linear.model import load_l2s_checkpoint
-    from method.l2s_linear.steering import get_l2s_linear_intervention
-    from method.S2S_R.evaluate_predictor import load_components
-    from method.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
+    from methods.S2S_R.eval_utils import get_additive_intervention
+    from methods.spherical_steering.steering import get_spherical_intervention
+    from methods.l2s_linear.model import load_l2s_checkpoint
+    from methods.l2s_linear.steering import get_l2s_linear_intervention
+    from methods.S2S_R.evaluate_predictor import load_components
+    from methods.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
     # Accelerate's execution device can differ from a CPU-offloaded parameter.
     device = execution_device(block)
     if method == 'baseline':
@@ -195,14 +195,14 @@ def make_hook(method, parameters, folder, block):
     checkpoint, average, predictor = load_components(str(folder / checkpoint_name), device)
     checkpoint.close()
     if method == 's2s_l':
-        from method.S2S_L.steering import get_s2s_l_intervention
+        from methods.S2S_L.steering import get_s2s_l_intervention
         return get_s2s_l_intervention(average, predictor, method='S2S_L_Static', **parameters)
     return get_s2s_r_intervention(average, predictor, **parameters)
 
 
 def score_answer(model, tokenizer, block, question, answer, hook, model_name):
     import torch
-    from method.S2S_R.eval_utils import get_instruction
+    from methods.S2S_R.eval_utils import get_instruction
     base = get_instruction(model_name) + '\n\n' + f'Q: {question} A:'
     device = execution_device(model.get_input_embeddings())
     prompt = tokenizer(base, return_tensors='pt').input_ids.to(device)
@@ -230,7 +230,7 @@ def score_answer(model, tokenizer, block, question, answer, hook, model_name):
 def evaluate(model, tokenizer, block, frame, ids, hook, config):
     import numpy as np
     from tqdm import tqdm
-    from method.S2S_R.eval_utils import format_best, split_multi_answer
+    from methods.S2S_R.eval_utils import format_best, split_multi_answer
     from truthfulqa.models import MC_calcs, set_columns
     frame = frame[frame['hf_idx'].isin(ids)].copy().reset_index(drop=True)
     if set(map(int, frame['hf_idx'])) != set(ids):
@@ -261,7 +261,7 @@ def main():
     import torch
     import transformers
     import numpy as np
-    from method.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
+    from methods.S2S_R.eval_utils import load_truthfulqa_mc_dataframe, set_seed
     torch.set_num_threads(4)
     set_seed(config['seed'])
     output = Path(config['output_dir'])
@@ -282,7 +282,7 @@ def main():
     if not feature.exists():
         write_json(output / 'status.json', dict(state='extracting', pid=os.getpid()))
         prepare_features(model, tokenizer, block, config, feature)
-    frame, dataset = load_truthfulqa_mc_dataframe(str(ROOT / 'TruthfulQA/data/v1/TruthfulQA.csv'))
+    frame, dataset = load_truthfulqa_mc_dataframe(str(ROOT / 'data/truthfulqa/TruthfulQA.csv'))
     reports = []
     for fold in (0, 1):
         folder = output / f'fold{fold}'

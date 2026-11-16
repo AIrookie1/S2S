@@ -71,7 +71,7 @@ for RUN_KAPPA in "${KAPPAS[@]}"; do
   fi
 
   echo "========== kappa=$RUN_KAPPA | gate=$WEIGHTS_GATE_MODE | evaluate =========="
-  run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" test.py \
+  run_cmd env CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" run_method.py \
     --method-dir S2S_R \
     --entry-file evaluate_S2S_R.py \
     -- \

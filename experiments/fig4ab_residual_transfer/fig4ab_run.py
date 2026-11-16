@@ -18,7 +18,7 @@ def main():
                 LLAMA_MODEL_DIR=a.model_dir,QWEN_MODEL_DIR=a.model_dir,CHECKPOINT_PATH=str(plan.s2s(fold)),
                 SPHERICAL_PROTO_DIR=str(plan.proto_dir),SPHERICAL_LAYER=str(plan.layer),
                 WEIGHT_KAPPA='3',MARGIN=str(-.3 if a.model=='qwen' and fold==0 else -.7),
-                OUTPUT_DIR=str(a.work_dir/'paper/fig4ab'/plan.name/method/f'fold{fold}'))
+                OUTPUT_DIR=str(a.work_dir/'paper/fig4ab'/plan.name/methods/f'fold{fold}'))
             cmd=['bash','experiments/fig4ab_residual_transfer/fig4ab_run.sh'];jobs.append(dict(command=cmd,env=env))
             if a.execute:
                 if not plan.s2s(fold).is_file():raise FileNotFoundError('Run Table 1 MC preparation first')

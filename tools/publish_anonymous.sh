@@ -10,7 +10,7 @@ import re,sys
 if not re.fullmatch(r"https://github\.com/[A-Za-z0-9-]+/[A-Za-z0-9_.-]+\.git",sys.argv[1]):
     raise SystemExit("Use a token-free HTTPS URL for your empty anonymous GitHub repository")
 CHECK
-"$PYTHON_BIN" -m reproducibility.verify_release .
+"$PYTHON_BIN" -m reproducibility.verify_release . --strict
 git init --initial-branch=main
 git config --local user.name "Anonymous Authors"
 git config --local user.email "anonymous@example.invalid"

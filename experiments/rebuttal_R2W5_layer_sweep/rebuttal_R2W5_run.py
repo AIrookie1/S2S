@@ -84,8 +84,8 @@ def main():
                 "learning_rate": float(env("LEARNING_RATE", 0.001)), "seed": int(env("SEED", 42)),
                 "device": env("DEVICE", "cuda")}
     # Include implementation content in cache identities, including shared method code.
-    sources = sorted(set(list(HERE.glob("*.py")) + list((ROOT / "method/S2S_R").glob("*.py"))
-                         + list((ROOT / "method/S2S_L").glob("*.py")) + list((ROOT / "method").glob("*.py"))
+    sources = sorted(set(list(HERE.glob("*.py")) + list((ROOT / "methods/S2S_R").glob("*.py"))
+                         + list((ROOT / "methods/S2S_L").glob("*.py")) + list((ROOT / "methods").glob("*.py"))
                          + [ROOT / "truthfulqa/models.py"]))
     code = fingerprint({str(p.relative_to(ROOT)): p.read_text() for p in sources})
     config = {"model_name": env("MODEL", "llama3.1-8B-Instruct"), "model_dir": str(Path(args.model_dir).resolve()),
@@ -130,7 +130,7 @@ def main():
             if mode == "1" or not valid:
                 if mode == "0" and not args.dry_run:
                     raise ValueError(f"Missing/mismatched checkpoint {checkpoint}; use RUN_TRAIN=auto")
-                command = [sys.executable, ROOT / "method/S2S_R/train_predictor.py", "--feature_path", feature,
+                command = [sys.executable, ROOT / "methods/S2S_R/train_predictor.py", "--feature_path", feature,
                            "--output_path", checkpoint, "--fold_idx", fold]
                 for name, value in training.items():
                     command.extend(["--" + name, value])

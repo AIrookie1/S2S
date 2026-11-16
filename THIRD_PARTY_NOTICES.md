@@ -1,22 +1,7 @@
 # Third-party notices
 
-- `truthfulqa/{models,utilities,configs,presets}.py` and
-  `TruthfulQA/data/v1/TruthfulQA.csv` are the local TruthfulQA evaluation dependency
-  and dataset used by this project. Upstream:
-  https://github.com/sylinrl/TruthfulQA ; the local checkout identifies commit
-  `23b7eace240507542b766128290700fd961432cd`. The local evaluation files may contain
-  adaptations; this is not a claim of byte-identical upstream code. The upstream
-  Apache-2.0 license is retained as `TruthfulQA/LICENSE`.
-- `experiments/rebuttal_R2Q4_bipo/vendor/` preserves upstream reference files and the
-  MIT license from https://github.com/CaoYuanpu/BiPO at commit
-  `cef1d00ab108d0e265578589e6b344b200ea3db8`. The adapted active runner is documented
-  separately. Upstream copyright notices remain intact.
-- `baukit` is an installed dependency from https://github.com/davidbau/baukit ;
-  its source revision is pinned in the root requirements files. Model weights and
-  third-party benchmark datasets retain their respective providers' terms and
-  are not repackaged as project-owned assets.
+- The local `truthfulqa/` helpers and `data/truthfulqa/TruthfulQA.csv` originate from the TruthfulQA evaluation dependency used by this project: https://github.com/sylinrl/TruthfulQA . Local adaptations may be present; an exact upstream Git revision was not established. The preserved Apache-2.0 license is `third_party/licenses/TruthfulQA-LICENSE`; the data snapshot checksum is recorded in `data/truthfulqa/README.md`.
+- `experiments/rebuttal_R2Q4_bipo/vendor/` retains upstream BiPO reference files and the MIT license from https://github.com/CaoYuanpu/BiPO at commit `cef1d00ab108d0e265578589e6b344b200ea3db8`. The active adapted runner is separate from the vendored trainer.
+- `baukit` is installed from https://github.com/davidbau/baukit at the revision pinned in `requirements/main.txt` and `requirements/scaling.txt`.
 
-This release does not assign a new license to original project code or relicense
-third-party material. Removing local personal paths does not remove upstream
-attribution obligations. Original scientific implementations are preserved;
-release tooling, configuration orchestration, and privacy filtering are new.
+This organization update does not assign a new license to original project code or relicense third-party material. Upstream copyright and attribution notices are retained. Model weights and external datasets keep their providers' terms.

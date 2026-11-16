@@ -106,7 +106,7 @@ def write_summaries(output, reports, config):
         os.replace(temporary, path)
         write_json(directory / f"{name}.json", {
             "selection": SELECTION,
-            "definition": "Arithmetic fold0/fold1 mean at the same parameter tuple; maximize MC1 per method/layer on test data.",
+            "definition": "Arithmetic fold0/fold1 mean at the same parameter tuple; maximize MC1 per methods/layer on test data.",
             "tie_break": "First numeric parameter tuple in sorted order.",
             "requested_config": config, "completed_layers": sorted({r["layer"] for r in rows}),
             "rows": data,

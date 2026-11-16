@@ -1,0 +1,36 @@
+{
+  "removed_public_paths": [
+    "experiments/cosine_similarity",
+    "experiments/word_number",
+    "experiments/truthfulqa",
+    "tools/validate_S2S_L_setup.py",
+    "tools/validate_S2S_R_setup.py",
+    "experiments/steering_vector_ablation/evaluate.py",
+    "experiments/steering_vector_ablation/run.sh",
+    "experiments/steering_vector_ablation/plot.py",
+    "experiments/steering_vector_ablation/plot.sh",
+    "docs/RESULT_PROVENANCE.md",
+    "docs/ANONYMOUS_PUBLICATION_ZH.md",
+    "docs/REBUTTAL_Q1_EXPERIMENT_CONFIGS_ZH.md",
+    "docs/FOLD_PROTOCOL.md",
+    "docs/EXPERIMENTS.md"
+  ],
+  "preserved_original_workspace": true,
+  "retained_evidence_records": 666,
+  "paper_pages": 19,
+  "raw_rebuttal_drafts_included": false,
+  "organization_update": {
+    "date": "2026-11-16",
+    "source_directories": [
+      "methods",
+      "scripts",
+      "configs",
+      "tests",
+      "requirements",
+      "data"
+    ],
+    "public_entrypoint": "python -m reproducibility",
+    "archived_metrics_changed": false,
+    "git_history_modified": false
+  }
+}
