@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.dyn3d_sga.eval_utils import (
+from method.S2S_R.eval_utils import (
     HF_NAMES,
     calculate_scores_fewshot,
     calculate_scores_zeroshot,

@@ -25,7 +25,7 @@ if [[ ! -s "$FEATURE_PATH" ]]; then
     exit 1
   fi
   mkdir -p "$(dirname "$FEATURE_PATH")"
-  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/dyn3d_sga/extract_features.py "$MODEL" \
+  CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" method/S2S_R/extract_features.py "$MODEL" \
     --model_dir "$MODEL_DIR" --layer "$LAYER" --save_dir "$(dirname "$FEATURE_PATH")" \
     --output_name "$(basename "$FEATURE_PATH")" --batch_size "$EXTRACT_BATCH_SIZE" \
     --device "$DEVICE" --dtype "$DTYPE" --split_seed "$SEED"

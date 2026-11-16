@@ -178,7 +178,7 @@ def get_mmlu_global_data(split='train', seed=42, tokenizer=None):
         for sub in subsets:
             try:
                 local_root = os.environ.get(
-                    "MMLU_CACHE_DIR", "/root/.cache/huggingface/datasets/mmlu"
+                    "MMLU_CACHE_DIR", "data/mmlu"
                 )
                 # The 5-shot ``dev`` files only contain five rows per subject,
                 # so they cannot support the documented 500/500 category split.

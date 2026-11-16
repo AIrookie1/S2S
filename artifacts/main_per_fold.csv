@@ -3,8 +3,8 @@ llama3.1-8B-Instruct,l2s,0,0,408,0.37745098039215685,0.5596241527049729,0.294021
 llama3.1-8B-Instruct,l2s,1,1,409,0.3545232273838631,0.5657710210186117,0.2892653393875888,archived,results/truthfulqa/l2s_linear/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold1_l2s_linear_mc.json
 llama3.1-8B-Instruct,spherical,0,1,408,0.5416666666666666,0.7136794944639977,0.4388888888888889,archived,results/truthfulqa/spherical_steering/llama3.1-8B-Instruct/mc/llama3.1-8B-Instruct_l14_fold1_a0.7_b-0.15.json
 llama3.1-8B-Instruct,spherical,1,0,409,0.4572127139364303,0.6563244880017501,0.3815519850972174,archived,results/truthfulqa/spherical_steering/llama3.1-8B-Instruct/mc/llama3.1-8B-Instruct_l14_fold0_a0.7_b-0.15.json
-llama3.1-8B-Instruct,s2s_r,0,0,408,0.6740196078431373,0.7845903361474609,0.6319366635543106,archived,results/truthfulqa/dyn3d_sga/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold0_mc.json
-llama3.1-8B-Instruct,s2s_r,1,1,409,0.46943765281173594,0.6505962771202999,0.3901540730391586,archived,results/truthfulqa/dyn3d_sga/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold1_mc.json
+llama3.1-8B-Instruct,s2s_r,0,0,408,0.6740196078431373,0.7845903361474609,0.6319366635543106,archived,results/truthfulqa/S2S_R/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold0_mc.json
+llama3.1-8B-Instruct,s2s_r,1,1,409,0.46943765281173594,0.6505962771202999,0.3901540730391586,archived,results/truthfulqa/S2S_R/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold1_mc.json
 llama3.1-8B-Instruct,s2s_l,0,0,408,0.49019607843137253,0.6762890950575553,0.4172735760971055,archived,results/truthfulqa/S2S_L_Static/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold0_S2S_L_Static_strength3.0_slerp0.2_mc.json
 llama3.1-8B-Instruct,s2s_l,1,1,409,0.38875305623471884,0.6194126634504208,0.3429114759188108,archived,results/truthfulqa/S2S_L_Static/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold1_S2S_L_Static_strength3.0_slerp0.2_mc.json
 llama3.1-8B-Instruct,baseline,,,,,,,original_artifact_not_found; run main suite,
@@ -13,9 +13,9 @@ Qwen2.5-7B-Instruct,l2s,0,0,408,0.375,0.5766079213262606,0.28202614379084967,arc
 Qwen2.5-7B-Instruct,l2s,1,1,409,0.34963325183374083,0.5591009181492507,0.2711782512516009,archived,results/truthfulqa/l2s_linear/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold1_l2s_linear_mc.json
 Qwen2.5-7B-Instruct,spherical,0,1,408,0.4877450980392157,0.6567142822481452,0.38203878773731714,archived,results/truthfulqa/spherical_steering/Qwen2.5-7B-Instruct/mc/Qwen2.5-7B-Instruct_l19_fold1_a0.6_b0.4.json
 Qwen2.5-7B-Instruct,spherical,1,0,409,0.4841075794621027,0.6825644011953672,0.40036286723328285,archived,results/truthfulqa/spherical_steering/Qwen2.5-7B-Instruct/mc/Qwen2.5-7B-Instruct_l19_fold0_a0.6_b0.4.json
-Qwen2.5-7B-Instruct,s2s_r,0,0,408,0.6617647058823529,0.7825509257660247,0.5834733893557423,archived,results/truthfulqa/dyn3d_sga/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold0_mc.json
-Qwen2.5-7B-Instruct,s2s_r,1,1,409,0.589242053789731,0.7357579235390865,0.5116185430977607,archived,results/truthfulqa/dyn3d_sga/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold1_mc.json
-Qwen2.5-7B-Instruct,s2s_l,0,0,408,0.4632352941176471,0.6583583052659694,0.3693539915966387,archived,results/truthfulqa/dyn2d/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold0_strength3.0_slerp0.2_mc.json
-Qwen2.5-7B-Instruct,s2s_l,1,1,409,0.43765281173594134,0.6556642667688458,0.36935518298598985,archived,results/truthfulqa/dyn2d/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold1_strength3.0_slerp0.2_mc.json
+Qwen2.5-7B-Instruct,s2s_r,0,0,408,0.6617647058823529,0.7825509257660247,0.5834733893557423,archived,results/truthfulqa/S2S_R/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold0_mc.json
+Qwen2.5-7B-Instruct,s2s_r,1,1,409,0.589242053789731,0.7357579235390865,0.5116185430977607,archived,results/truthfulqa/S2S_R/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold1_mc.json
+Qwen2.5-7B-Instruct,s2s_l,0,0,408,0.4632352941176471,0.6583583052659694,0.3693539915966387,archived,results/truthfulqa/S2S_L/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold0_strength3.0_slerp0.2_mc.json
+Qwen2.5-7B-Instruct,s2s_l,1,1,409,0.43765281173594134,0.6556642667688458,0.36935518298598985,archived,results/truthfulqa/S2S_L/Qwen2.5-7B-Instruct/Qwen2.5-7B-Instruct_l19_fold1_strength3.0_slerp0.2_mc.json
 Qwen2.5-7B-Instruct,baseline,,,,,,,original_artifact_not_found; run main suite,
 Qwen2.5-7B-Instruct,additive,,,,,,,original_artifact_not_found; run main suite,

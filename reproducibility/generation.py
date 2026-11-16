@@ -38,7 +38,7 @@ def read_prompts(path):
 def generate(model, tokenizer, prompt, max_new_tokens, hook=None, block=None,
              predictor=None, controls=None, eos_ids=()):
     import torch
-    from method.dyn3d_sga.evaluate_llm_judge_3d import fixed_dynamic_controls
+    from method.S2S_R.evaluate_llm_judge_S2S_R import fixed_dynamic_controls
     ids = tokenizer(prompt, return_tensors="pt").input_ids.to(model.get_input_embeddings().weight.device)
     emitted = []
     reason = "length"
@@ -47,7 +47,7 @@ def generate(model, tokenizer, prompt, max_new_tokens, hook=None, block=None,
         if hook is not None:
             def edit(_module, _inputs, output):
                 h = output[0] if isinstance(output, (tuple, list)) else output
-                return hook(output, start_idx=h.shape[1] - 1)
+                return hook(output, layer_name=None, start_idx=h.shape[1] - 1)
             handle = block.register_forward_hook(edit)
         try:
             context = fixed_dynamic_controls(predictor, controls) if controls is not None else nullcontext()
@@ -98,6 +98,7 @@ def main():
     p.add_argument("--layer", type=int, required=True)
     p.add_argument("--s2s-checkpoint", type=Path, required=True)
     p.add_argument("--l2s-checkpoint", type=Path, required=True)
+    p.add_argument("--spherical-prototype", type=Path)
     p.add_argument("--prompts", type=Path, required=True)
     p.add_argument("--output-dir", type=Path, required=True)
     p.add_argument("--max-new-tokens", type=int, default=200)
@@ -119,13 +120,13 @@ def main():
     import numpy as np
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    from method.dyn3d_sga.evaluate_dyn_mlp import load_components
-    from method.dyn3d_sga.evaluate_3d_dyn import get_3d_dynamic_intervention
-    from method.dyn2d.steering import get_2d_dynamic_intervention
+    from method.S2S_R.evaluate_predictor import load_components
+    from method.S2S_R.evaluate_S2S_R import get_s2s_r_intervention
+    from method.S2S_L.steering import get_s2s_l_intervention
     from method.l2s_linear.model import load_l2s_checkpoint
     from method.l2s_linear.steering import get_l2s_linear_intervention
-    from method.dyn3d_sga.evaluate_llm_judge_3d import capture_probe_last_hidden, controls_from_cached_hidden
-    from experiments.model_scaling_ablation.common import decoder_layers
+    from method.S2S_R.evaluate_llm_judge_S2S_R import capture_probe_last_hidden, controls_from_cached_hidden
+    from experiments.rebuttal_R1W2_model_scaling.common import decoder_layers
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but unavailable")
     random.seed(args.seed)
@@ -136,11 +137,12 @@ def main():
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     config = {k: v for k, v in vars(args).items()
-              if k not in ("model", "prompts", "s2s_checkpoint", "l2s_checkpoint", "output_dir")}
+              if k not in ("model", "prompts", "s2s_checkpoint", "l2s_checkpoint", "spherical_prototype", "output_dir")}
     config.update(dataset_sha256=fingerprint(args.prompts), s2s_sha256=fingerprint(args.s2s_checkpoint),
                   l2s_sha256=fingerprint(args.l2s_checkpoint), checkpoint_splits=splits,
                   model_label=args.model_name, decoding="greedy; EOS allowed; no minimum length; no forced padding",
-                  methods=["baseline", "l2s", "s2s_l", "s2s_r"],
+                  methods=["baseline", "l2s", "s2s_l", "s2s_r"] + (["spherical"] if args.spherical_prototype else []),
+                  spherical_sha256=fingerprint(args.spherical_prototype) if args.spherical_prototype else None,
                   token_count="emitted tokens including terminal EOS; limit hit only when EOS did not stop generation",
                   source_sha256={str(x.relative_to(ROOT)):fingerprint(x) for folder in ("method", "reproducibility")
                                  for x in sorted((ROOT / folder).rglob("*.py"))},
@@ -165,10 +167,19 @@ def main():
     predictor.eval()
     l2s.eval()
     hooks = dict(baseline=None, l2s=get_l2s_linear_intervention(l2s, alpha=args.l2s_alpha),
-                 s2s_l=get_2d_dynamic_intervention(average, predictor, method="S2S_L_Static",
+                 s2s_l=get_s2s_l_intervention(average, predictor, method="S2S_L_Static",
                                                    strength=args.strength, slerp_t=args.slerp_t),
-                 s2s_r=get_3d_dynamic_intervention(average, predictor, weight_kappa=args.weight_kappa,
+                 s2s_r=get_s2s_r_intervention(average, predictor, weight_kappa=args.weight_kappa,
                                                   margin=args.margin))
+    if args.spherical_prototype:
+        from method.spherical_steering.steering import get_spherical_intervention
+        with np.load(args.spherical_prototype, allow_pickle=False) as proto:
+            if set(int(q) for q in proto['test_q_indices']) != set(splits['s2s']['test_q_indices']):
+                raise ValueError('Spherical and S2S checkpoints have different test question IDs')
+            mu_t=torch.tensor(proto['mu_T'],device=args.device,dtype=torch.float32)
+            mu_h=torch.tensor(proto['mu_H'],device=args.device,dtype=torch.float32)
+        alpha,beta=(.6,.4) if 'qwen' in args.model_name.lower() else (.7,-.15)
+        hooks['spherical']=get_spherical_intervention(mu_t,mu_h,kappa=20.,alpha=alpha,beta=beta)
     eos = model.generation_config.eos_token_id
     eos_ids = set(eos if isinstance(eos, list) else ([] if eos is None else [eos]))
     if tokenizer.eos_token_id is not None:

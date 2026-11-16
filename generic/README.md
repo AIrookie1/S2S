@@ -11,7 +11,7 @@ Supported datasets are:
 - `mmlu_global`
 - `winogrande`
 
-Dyn3D uses a direct MLP predictor with the existing adaptive spherical
+S2S_R uses a direct MLP predictor with the existing adaptive spherical
 steering rule. L2S-LINEAR now uses the same generic hidden-state features and
 MC1 scoring pipeline, but applies its standard additive rule:
 

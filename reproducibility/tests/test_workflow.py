@@ -99,7 +99,7 @@ class ReproductionTests(unittest.TestCase):
     def test_extraction_rejects_inconsistent_saved_metrics(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            path = root / "results/truthfulqa/dyn3d_sga/model/fold0.json"
+            path = root / "results/truthfulqa/S2S_R/model/fold0.json"
             path.parent.mkdir(parents=True)
             path.write_text(json.dumps(dict(metrics=dict(MC1=.2), results=[dict(hf_idx=0, MC1=1)])))
             with self.assertRaises(ValueError):

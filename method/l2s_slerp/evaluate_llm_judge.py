@@ -22,8 +22,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.dyn3d_sga.eval_utils import HF_NAMES, resolve_device
-from method.dyn3d_sga.evaluate_llm_judge import (
+from method.S2S_R.eval_utils import HF_NAMES, resolve_device
+from method.S2S_R.evaluate_llm_judge import (
     evaluate_with_judge,
     format_generation_prompt,
     run_judge_phase,
@@ -32,8 +32,8 @@ from method.l2s_slerp.model import load_l2s_checkpoint
 from method.l2s_slerp.steering import get_l2s_slerp_intervention
 
 
-TRUTH_JUDGE_DEFAULT = "/mnt/nas-public-bing/pinxuanli11/truthfulqa-truth-judge-llama2-7B"
-INFO_JUDGE_DEFAULT = "/mnt/nas-public-bing/pinxuanli11/truthfulqa-info-judge-llama2-7B"
+TRUTH_JUDGE_DEFAULT = "models/truthfulqa-truth-judge-llama2-7B"
+INFO_JUDGE_DEFAULT = "models/truthfulqa-info-judge-llama2-7B"
 
 
 def set_seed(seed: int) -> None:

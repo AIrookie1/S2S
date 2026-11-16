@@ -11,8 +11,8 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 METRICS = ("MC1", "MC2", "MC3")
-GROUPS = ("model_scaling_ablation", "component_ablation", "bipo_truthfulqa",
-          "l2s_noise_robustness", "margin_ablation", "margin_gate_correctness", "gate_correctness")
+GROUPS = ("rebuttal_R1W2_model_scaling", "table3_component_ablation", "rebuttal_R2Q4_bipo",
+          "fig5_target_noise", "fig3c_gate_margin", "rebuttal_R3Q3_margin_gates", "rebuttal_R3Q3_candidate_gates")
 CLAIMS = (
     ("qwen3_s2sl_table_a", "Qwen2.5-3B", "s2s_l", 32.68),
     ("qwen3_s2sl_table_b", "Qwen2.5-3B", "s2s_l", 36.68),
@@ -48,9 +48,9 @@ def fold_id(path):
 
 def method_id(value):
     value = value.lower().replace("-", "_")
-    if value in ("s2s_l_static", "s2s_l", "dyn2d") or "dyn2d" in value:
+    if value in ("s2s_l_static", "s2s_l", "S2S_L") or "s2s_l" in value:
         return "s2s_l"
-    if value in ("dyn3d_sga", "s2s_r") or "similarity_graph" in value:
+    if value in ("s2s_r",) or "similarity_graph" in value:
         return "s2s_r"
     if value == "l2s_linear":
         return "l2s"
@@ -239,8 +239,8 @@ def write_audit(source, output, sanitizer=lambda s: s):
     write_json(output / "evidence.json", dict(units="MC fractions in [0,1]", records=records, validation_errors=errors))
     per_fold, averages = [], []
     for model in ("llama3.1-8B-Instruct", "Qwen2.5-7B-Instruct"):
-        paths = dict(l2s="l2s_linear", spherical="spherical_steering", s2s_r="dyn3d_sga",
-                     s2s_l="S2S_L_Static" if model.startswith("llama") else "dyn2d")
+        paths = dict(l2s="l2s_linear", spherical="spherical_steering", s2s_r="S2S_R",
+                     s2s_l="S2S_L_Static" if model.startswith("llama") else "S2S_L")
         for method, folder in paths.items():
             chosen = [r for r in records if r["source"].startswith(f"results/truthfulqa/{folder}/{model}/")]
             if len(chosen) != 2:

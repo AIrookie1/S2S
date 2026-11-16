@@ -1,1 +1,1 @@
-__all__ = ["dyn3d_sga"]
+__all__ = ["S2S_R"]

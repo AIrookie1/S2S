@@ -7,7 +7,7 @@
       "matches": [
         {
           "evidence_id": "167dbe5edef55957",
-          "source": "results/experiment/model_scaling_ablation/Qwen2.5-3B-Instruct/bfloat16/summary.json",
+          "source": "results/experiment/rebuttal_R1W2_model_scaling/Qwen2.5-3B-Instruct/bfloat16/summary.json",
           "model": "Qwen/Qwen2.5-3B-Instruct",
           "method": "s2s_l",
           "fold": null,
@@ -20,9 +20,10 @@
             "seed": 42,
             "selection": "dev_MC1_then_MC2_then_grid_order",
             "prompt": "repository_zero_shot_instruction_no_chat_template",
-            "s2s_l_variant": "S2S-L (current get_2d_dynamic_intervention)"
+            "s2s_l_variant": "S2S-L (current get_s2s_l_intervention)"
           },
-          "parameters": {}
+          "parameters": {},
+          "archive_source_path_sha256": "3af777a03faf27df5acb035b66abb9a0624c435a2c1b3cceafe34060a8b13ec9"
         }
       ]
     },
@@ -39,7 +40,7 @@
       "matches": [
         {
           "evidence_id": "862f6e371e88be59",
-          "source": "results/experiment/model_scaling_ablation/Qwen2.5-14B-Instruct/nf4/summary.json",
+          "source": "results/experiment/rebuttal_R1W2_model_scaling/Qwen2.5-14B-Instruct/nf4/summary.json",
           "model": "Qwen/Qwen2.5-14B-Instruct",
           "method": "s2s_l",
           "fold": null,
@@ -52,9 +53,10 @@
             "seed": 42,
             "selection": "dev_MC1_then_MC2_then_grid_order",
             "prompt": "repository_zero_shot_instruction_no_chat_template",
-            "s2s_l_variant": "S2S-L (current get_2d_dynamic_intervention)"
+            "s2s_l_variant": "S2S-L (current get_s2s_l_intervention)"
           },
-          "parameters": {}
+          "parameters": {},
+          "archive_source_path_sha256": "ae7dc3d5b406582fd90b7eb5f0bd4fe821c6b1c0aec4ed23bffd86d6f397f6ce"
         }
       ]
     },
@@ -99,11 +101,12 @@
             "few_shot": false,
             "preset": "qa",
             "steering_enabled": true
-          }
+          },
+          "archive_source_path_sha256": "9da262a2620226cde7db9a679196584ceeec0c150bac21d1d69736384efae6c7"
         },
         {
           "evidence_id": "5e0e777cad12e5aa",
-          "source": "results/truthfulqa/dyn2d/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold0_strength3.0_slerp0.2_mc.json",
+          "source": "results/truthfulqa/S2S_L/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold0_strength3.0_slerp0.2_mc.json",
           "model": "llama3.1-8B-Instruct",
           "method": "s2s_l",
           "fold": 0,
@@ -131,11 +134,12 @@
             "few_shot": false,
             "preset": "qa",
             "steering_enabled": true
-          }
+          },
+          "archive_source_path_sha256": "da99f0f1a73ad725b9424495911e971eff99d04f204faa6cb2493c20374644d0"
         },
         {
           "evidence_id": "56b23fcc2dffb104",
-          "source": "results/experiment/l2s_noise_robustness/llama3.1-8B-Instruct/fold0/noise_0/s2s_l_static.json",
+          "source": "results/experiment/fig5_target_noise/llama3.1-8B-Instruct/fold0/noise_0/s2s_l_static.json",
           "model": "llama3.1-8B-Instruct",
           "method": "s2s_l",
           "fold": 0,
@@ -167,11 +171,12 @@
             "steering_enabled": true,
             "residual_noise_sigma": 0.0,
             "residual_noise_seed": 42
-          }
+          },
+          "archive_source_path_sha256": "a33b17d5cbd6b92f598a3f0ea5d91ca9081949c563922f5cb4b1ac3ceb3452a6"
         },
         {
           "evidence_id": "e97930410a9837ce",
-          "source": "results/experiment/l2s_noise_robustness/llama3.1-8B-Instruct/fold0/noise_1p0/s2s_l_static.json",
+          "source": "results/experiment/fig5_target_noise/llama3.1-8B-Instruct/fold0/noise_1p0/s2s_l_static.json",
           "model": "llama3.1-8B-Instruct",
           "method": "s2s_l",
           "fold": 0,
@@ -203,7 +208,8 @@
             "steering_enabled": true,
             "residual_noise_sigma": 1.0,
             "residual_noise_seed": 42
-          }
+          },
+          "archive_source_path_sha256": "7e700da98b2263884f671645a828f589acd3b4bd6a37eee7c1728dcb9c825726"
         }
       ]
     },
@@ -214,7 +220,7 @@
       "matches": [
         {
           "evidence_id": "279d0b72124c6fdc",
-          "source": "results/experiment/component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/grid_summary.json",
+          "source": "results/experiment/table3_component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/grid_summary.json",
           "model": "llama3.1-8B-Instruct",
           "method": "vavg_aw_gate",
           "fold": 1,
@@ -226,11 +232,12 @@
           "parameters": {
             "weight_kappa": 2.5,
             "margin": 0.965
-          }
+          },
+          "archive_source_path_sha256": "31ff1c760644499c2b4bedd29ff42a835eb79a554e4d9b11b9d2366696634e3f"
         },
         {
           "evidence_id": "c7bb7ade705099a0",
-          "source": "results/experiment/component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/refine_kappa2.5/cells/kappa2.5_margin0.965.json",
+          "source": "results/experiment/table3_component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/refine_kappa2.5/cells/kappa2.5_margin0.965.json",
           "model": "llama3.1-8B-Instruct",
           "method": "vavg_aw_gate",
           "fold": 1,
@@ -242,11 +249,12 @@
           "parameters": {
             "weight_kappa": 2.5,
             "margin": 0.965
-          }
+          },
+          "archive_source_path_sha256": "5e5210024948f1af0344d033becdacbadd1d2beb64edcaa941b87cec3cb1525f"
         },
         {
           "evidence_id": "b92c893d0c448447",
-          "source": "results/experiment/component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/refine_kappa2.5/grid_summary.json",
+          "source": "results/experiment/table3_component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/refine_kappa2.5/grid_summary.json",
           "model": "llama3.1-8B-Instruct",
           "method": "vavg_aw_gate",
           "fold": 1,
@@ -258,7 +266,8 @@
           "parameters": {
             "weight_kappa": 2.5,
             "margin": 0.965
-          }
+          },
+          "archive_source_path_sha256": "584fa16d8a31ebe9b08c6e0f6ade537b0188f1b168232e750996cf1309ce53d2"
         }
       ]
     },

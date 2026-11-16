@@ -1,8 +1,6 @@
 features
 results
 prototypes
-TruthfulQA
-truthfulqa
 results_llm_judge
 results_llm_judge_dynSVD_spherical
 features_generic
@@ -38,3 +36,16 @@ anonymous_release*/
 .env.*
 models/
 data/
+
+# Reproduction and release outputs
+results/
+features/
+checkpoints/
+prototypes/
+data/
+models/
+.venv*/
+.env*
+*.log
+*.zip
+anonymous_release*/

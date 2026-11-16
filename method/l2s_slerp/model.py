@@ -67,7 +67,7 @@ def _as_float_pairs(data: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         # Compatibility with older feature files.  Pair construction still
         # uses the raw answer-level activations and therefore remains
         # unnormalized.  The current extractor writes the pair-level fields.
-        from method.dyn3d_sga.data import build_question_vectors
+        from method.S2S_R.data import build_question_vectors
 
         activations = np.asarray(data["activations"], dtype=np.float32)
         labels = np.asarray(data["labels"], dtype=np.int64).reshape(-1)
@@ -119,7 +119,7 @@ def load_l2s_pairs(path: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray
     return z_neg, vectors, q_indices, metadata
 
 
-def split_like_dyn3d(
+def split_like_s2s_r(
     q_indices: np.ndarray,
     metadata: dict[str, Any],
     *,
@@ -128,12 +128,12 @@ def split_like_dyn3d(
     val_fraction: float,
     seed: int,
 ) -> dict[str, np.ndarray]:
-    """Reproduce Dyn3D question splitting exactly.
+    """Reproduce S2S_R question splitting exactly.
 
-    The current Dyn3D feature extractor has no precomputed fold fields, so the
+    The current S2S_R feature extractor has no precomputed fold fields, so the
     normal path uses sorted questions plus ``np.array_split``.  If a feature
     artifact already contains ``train_q_indices``/``test_q_indices``, the
-    Dyn3D convention is preserved: ``test_q_indices`` is the selected outer
+    S2S_R convention is preserved: ``test_q_indices`` is the selected outer
     fold and ``train_q_indices`` is the held-out complement.
     """
     if num_folds < 1 or not 0 <= fold_idx < num_folds:

@@ -14,7 +14,7 @@ The four standard sizes are built from two widths and two heights:
 | `quarter_quarter` | `5 × 4` |
 
 The current `10 × 4` and `5 × 4` ablation sizes are therefore preserved.
-Special figures (`kappa_view`, heatmap, L2S reliability, word-number, etc.)
+Special figures (`fig3d_adaptive_weights`, heatmap, L2S reliability, word-number, etc.)
 are also defined in this file, so their custom aspect ratio remains editable
 from one place.
 
@@ -51,9 +51,9 @@ Edit this file for figure-specific behavior:
 - ternary-grid / mean-marker layout
 - word-number figure-level text positions
 
-For example, changing `margin_ablation["size"]` from `half_quarter` to
+For example, changing `fig3c_gate_margin["size"]` from `half_quarter` to
 `half_half` changes its physical size without touching the plotting script.
-Changing `margin_ablation["show"]["legend"]` to `False` removes its legend.
+Changing `fig3c_gate_margin["show"]["legend"]` to `False` removes its legend.
 
 ## Shared helpers
 
@@ -61,9 +61,9 @@ Changing `margin_ablation["show"]["legend"]` to `False` removes its legend.
 and saving. `plot_large.py` is kept only as a compatibility wrapper; new plots
 should use `plot_common.py` plus the three configuration files above.
 
-## `kappa_view`
+## `fig3d_adaptive_weights`
 
-`experiments/kappa_view/plot.sh` uses the current Dyn3D method and standard
+`experiments/fig3d_adaptive_weights/fig3d_plot.sh` uses the current S2S_R method and standard
 checkpoint layout. Defaults are Llama fold0 and `kappa = 1 3 5 10`.
 
 `WEIGHTS_GATE_MODE=all` visualizes every token for which adaptive weights were

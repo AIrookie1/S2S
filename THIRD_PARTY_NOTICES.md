@@ -7,7 +7,7 @@
   `23b7eace240507542b766128290700fd961432cd`. The local evaluation files may contain
   adaptations; this is not a claim of byte-identical upstream code. The upstream
   Apache-2.0 license is retained as `TruthfulQA/LICENSE`.
-- `experiments/bipo_truthfulqa/vendor/` preserves upstream reference files and the
+- `experiments/rebuttal_R2Q4_bipo/vendor/` preserves upstream reference files and the
   MIT license from https://github.com/CaoYuanpu/BiPO at commit
   `cef1d00ab108d0e265578589e6b344b200ea3db8`. The adapted active runner is documented
   separately. Upstream copyright notices remain intact.

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from method.l2s_linear.model import fit_l2s, load_l2s_pairs, split_like_dyn3d
+from method.l2s_linear.model import fit_l2s, load_l2s_pairs, split_like_s2s_r
 
 
 def main() -> None:
@@ -35,7 +35,7 @@ def main() -> None:
     args = parser.parse_args()
 
     z_neg, vectors, q_indices, metadata = load_l2s_pairs(args.feature_path)
-    split = split_like_dyn3d(
+    split = split_like_s2s_r(
         q_indices,
         metadata,
         num_folds=args.num_folds,
@@ -43,7 +43,7 @@ def main() -> None:
         val_fraction=args.val_fraction,
         seed=args.seed,
     )
-    # Use the same within-fold optimization subset as Dyn3D's direct MLP so
+    # Use the same within-fold optimization subset as S2S_R's direct MLP so
     # the comparison retains identical question-level splitting.
     optimization_q = split["predictor_q_indices"]
     mean_q = split["geometry_train_q_indices"]
@@ -104,12 +104,12 @@ def main() -> None:
         "history_json": np.asarray(json.dumps(history, ensure_ascii=False)),
         "metrics_json": np.asarray(json.dumps(metrics, ensure_ascii=False)),
         "v_avg": v_avg,
-        # Keep the exact Dyn3D split names, plus an explicit L2S-LINEAR training name.
+        # Keep the exact S2S_R split names, plus an explicit L2S-LINEAR training name.
         "outer_train_q_indices": split["outer_train_q_indices"],
         "geometry_train_q_indices": split["geometry_train_q_indices"],
-        # Keep Dyn3D's checkpoint convention: train_q_indices denotes the
+        # Keep S2S_R's checkpoint convention: train_q_indices denotes the
         # complete selected outer fold.  The actual L2S-LINEAR optimizer subset is
-        # recorded separately below, just as Dyn3D records its MLP subset.
+        # recorded separately below, just as S2S_R records its MLP subset.
         "train_q_indices": split["outer_train_q_indices"],
         "val_q_indices": split["val_q_indices"],
         "predictor_q_indices": split["predictor_q_indices"],

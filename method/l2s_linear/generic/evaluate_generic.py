@@ -2,7 +2,7 @@
 
 This module intentionally reuses the canonical generic dataset loading,
 prompt construction, option scoring, and MC1 evaluation functions used by
-Dyn3D. Only the checkpoint loader and steering hook are L2S-LINEAR-specific.
+S2S_R. Only the checkpoint loader and steering hook are L2S-LINEAR-specific.
 """
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from method.dyn3d_sga.generic.evaluate_generic import (
+from method.S2S_R.generic.evaluate_generic import (
     evaluate_boolq,
     evaluate_copa,
     evaluate_mmlu_global,
     evaluate_storycloze,
     evaluate_winogrande,
 )
-from method.dyn3d_sga.generic.utils_generic import HF_NAMES, set_seed
+from method.S2S_R.generic.utils_generic import HF_NAMES, set_seed
 from method.l2s_linear.model import load_l2s_checkpoint
 from method.l2s_linear.steering import get_l2s_linear_intervention
 

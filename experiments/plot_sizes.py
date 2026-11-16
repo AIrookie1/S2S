@@ -37,12 +37,12 @@ STANDARD_FIGURE_SIZES: Final = {
 # Non-standard aspect ratios that are useful for a particular figure type.
 # They remain centralized and can be replaced by a standard preset at any time.
 CUSTOM_FIGURE_SIZES: Final = {
-    "steering_vector_ablation": (WIDTH_INCHES["1/4"]+1.5, HEIGHT_INCHES["1/4"]),
-    "dyn2d_heatmap": (9.0, 7.0),
-    "kappa_view": (5.25, 4.95),
+    "fig2a_oracle_vectors": (WIDTH_INCHES["1/4"]+1.5, HEIGHT_INCHES["1/4"]),
+    "S2S_L_heatmap": (9.0, 7.0),
+    "fig3d_adaptive_weights": (5.25, 4.95),
     "l2s_performance": (WIDTH_INCHES["1/4"]+0.4, HEIGHT_INCHES["1/4"]),
     "l2s_vector_reliability": (WIDTH_INCHES["1/4"]+3.5, HEIGHT_INCHES["1/4"]),
-    "residual_analysis": (5.35, 4.6),
+    "fig4ab_residual_transfer": (5.35, 4.6),
     "word_number_two_panel": (18.0, 6.9),
     "word_number_single_panel": (9.0, 5.6),
 }

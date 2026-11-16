@@ -18,7 +18,7 @@ MODELS = {
     "llama": ("llama3.1-8B-Instruct", "meta-llama/Llama-3.1-8B-Instruct", 14),
     "qwen": ("Qwen2.5-7B-Instruct", "Qwen/Qwen2.5-7B-Instruct", 19),
 }
-SCALING = ("qwen05", "qwen15", "qwen3", "qwen14")
+SCALING = ("qwen05", "qwen15", "qwen3", "qwen14", "qwen35", "nemotron_nano8b", "qwen32")
 MARGINS = (-0.8, -0.7, -0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
 
 
@@ -48,7 +48,7 @@ class Plan:
         self.model_dir = args.model_dir or default_dir
         self.work = args.work_dir
         self.feature = self.work / "features" / f"{self.name}_layer{self.layer}.npz"
-        self.dyn_dir = self.work / "checkpoints/dyn3d_sga/truthfulqa" / self.name
+        self.s2s_r_dir = self.work / "checkpoints/S2S_R/truthfulqa" / self.name
         self.l2s_dir = self.work / "checkpoints/l2s_linear/truthfulqa" / self.name
         self.additive_dir = self.work / "additive_vectors" / self.name
         self.proto_dir = self.work / "prototypes" / self.name
@@ -67,8 +67,8 @@ class Plan:
     def entry(self, method, script, *args):
         return self.py("test.py", "--method-dir", method, "--entry-file", script, "--", *args)
 
-    def dyn(self, fold):
-        return self.dyn_dir / f"{self.name}_layer{self.layer}_dynMLP_fold{fold}_mean.npz"
+    def s2s(self, fold):
+        return self.s2s_r_dir / f"{self.name}_layer{self.layer}_predictor_fold{fold}_mean.npz"
 
     def l2s(self, fold):
         return self.l2s_dir / f"{self.name}_layer{self.layer}_l2s_linear_fold{fold}.npz"
@@ -79,7 +79,7 @@ class Plan:
 
     def prepare(self, l2s=False, prototypes=False, train=True):
         a = self.args
-        self.add(f"extract-{self.name}", self.py("method/dyn3d_sga/extract_features.py", self.name,
+        self.add(f"extract-{self.name}", self.py("method/S2S_R/extract_features.py", self.name,
                  "--model_dir", self.model_dir, "--layer", self.layer, "--save_dir", self.feature.parent,
                  "--output_name", self.feature.name, "--device", a.device, "--dtype", a.dtype,
                  "--split_seed", a.seed), [self.feature])
@@ -88,8 +88,8 @@ class Plan:
                       "--val_fraction", 0.5, "--mlp_hidden", 256, "--epochs", a.epochs,
                       "--batch_size", 256, "--learning_rate", 0.001, "--seed", a.seed,
                       "--device", a.device]
-            self.add(f"train-s2s-{self.name}-{f}", self.py("method/dyn3d_sga/train_dyn_mlp.py",
-                     *shared, "--positive_mode", "mean", "--output_path", self.dyn(f)), [self.dyn(f)])
+            self.add(f"train-s2s-{self.name}-{f}", self.py("method/S2S_R/train_predictor.py",
+                     *shared, "--positive_mode", "mean", "--output_path", self.s2s(f)), [self.s2s(f)])
             if l2s:
                 self.add(f"train-l2s-{self.name}-{f}", self.py("method/l2s_linear/train_l2s.py",
                          *shared, "--output_path", self.l2s(f)), [self.l2s(f)])
@@ -116,7 +116,7 @@ class Plan:
                 if method in ("baseline", "additive"):
                     extra = ["--no_intervention"] if method == "baseline" else [
                         "--vector_source", "v", "--no_normalize_v", "--alpha", 1.0]
-                    cmd = self.entry("dyn3d_sga", "eval_utils.py", *common,
+                    cmd = self.entry("S2S_R", "eval_utils.py", *common,
                         "--dtype", self.args.dtype, "--prototype_path", self.additive_dir / f"fold{f}.npz",
                         "--eval_split", "test", *extra, "--output_path", target, "--save_details")
                 elif method == "spherical":
@@ -126,15 +126,15 @@ class Plan:
                         "--beta", beta, "--output_path", target, "--save_details")
                 elif method == "l2s":
                     cmd = self.entry("l2s_linear", "evaluate_mc.py", *common, "--dtype", self.args.dtype,
-                        "--checkpoint_path", self.l2s(f), "--eval_split", "test", "--alpha", 1.0,
+                        "--checkpoint_path", self.l2s(f), "--eval_split", "test", "--alpha", (1.4 if self.args.model == "qwen" else 1.0),
                         "--output_path", target, "--save_details")
                 elif method == "s2s_l":
-                    cmd = self.entry("dyn2d", "evaluate_2d_dyn.py", *common, "--dtype", self.args.dtype,
-                        "--checkpoint_path", self.dyn(f), "--method", "S2S_L_Static", "--strength", 3.0,
+                    cmd = self.entry("S2S_L", "evaluate_S2S_L.py", *common, "--dtype", self.args.dtype,
+                        "--checkpoint_path", self.s2s(f), "--method", "S2S_L_Static", "--strength", 3.0,
                         "--slerp_t", 0.2, "--eval_split", "test", "--output_path", target, "--save_details")
                 else:
-                    cmd = self.entry("dyn3d_sga", "evaluate_3d_dyn.py", *common, "--dtype", self.args.dtype,
-                        "--checkpoint_path", self.dyn(f), "--weight_kappa", 3, "--margin", -0.7,
+                    cmd = self.entry("S2S_R", "evaluate_S2S_R.py", *common, "--dtype", self.args.dtype,
+                        "--checkpoint_path", self.s2s(f), "--weight_kappa", 3, "--margin", (-0.3 if self.args.model == "qwen" and f == 0 else -0.7),
                         "--eval_split", "test", "--output_path", target, "--save_details")
                 self.add(f"main-{self.name}-{f}-{method}", cmd, [target])
 
@@ -148,14 +148,14 @@ class Plan:
         self.prepare()
         for f in self.args.folds:
             out = self.work / "component" / self.name / f"fold{f}"
-            self.add(f"component-{self.name}-{f}", self.py("experiments/component_ablation/evaluate.py",
-                *self.common(f), "--dtype", self.args.dtype, "--checkpoint_path", self.dyn(f),
+            self.add(f"component-{self.name}-{f}", self.py("experiments/table3_component_ablation/evaluate.py",
+                *self.common(f), "--dtype", self.args.dtype, "--checkpoint_path", self.s2s(f),
                 "--expected_fold", f, "--weight_kappa", 3, "--margin", -0.7,
                 "--variants", "vavg", "vavg_aw_gate", "mlp", "s2s_fixed", "s2s_adaptive", "s2s_full",
                 "--eval_split", "test", "--output_dir", out, "--save_details"), [out / "summary.json"])
             review_out = self.work / "component_review_control" / self.name / f"fold{f}"
-            self.add(f"review-control-{self.name}-{f}", self.py("experiments/component_ablation/evaluate.py",
-                *self.common(f), "--dtype", self.args.dtype, "--checkpoint_path", self.dyn(f),
+            self.add(f"review-control-{self.name}-{f}", self.py("experiments/table3_component_ablation/evaluate.py",
+                *self.common(f), "--dtype", self.args.dtype, "--checkpoint_path", self.s2s(f),
                 "--expected_fold", f, "--weight_kappa", 2.5, "--margin", 0.965,
                 "--variants", "vavg_aw_gate", "--eval_split", "test", "--output_dir", review_out,
                 "--save_details"), [review_out / "summary.json"])
@@ -163,18 +163,18 @@ class Plan:
     def generic(self):
         family = self.args.model.upper()
         for dataset in self.args.datasets:
-            for directory, method in (("dyn3d", "S2S_R"), ("dyn2d", "S2S_L_Static"),
+            for directory, method in (("S2S_R", "S2S_R"), ("S2S_L", "S2S_L_Static"),
                                        ("l2s_linear", "l2s_linear"), ("spherical_steering", "spherical_steering")):
                 env = dict(PYTHON_BIN=sys.executable, LLAMA_MODEL_DIR=self.model_dir, QWEN_MODEL_DIR=self.model_dir,
                     GPU=self.args.gpu, DEVICE=self.args.device, DTYPE=self.args.dtype, SEED=str(self.args.seed),
-                    EPOCHS=str(self.args.epochs), RUN_EXTRACT="1", RUN_TRAIN="1", RUN_EVAL="1", RUN_PROTOTYPE="1",
+                    EPOCHS=str(400 if self.args.model == "qwen" and dataset == "copa" and self.args.epochs == 2000 else self.args.epochs), RUN_EXTRACT="1", RUN_TRAIN="1", RUN_EVAL="1", RUN_PROTOTYPE="1",
                     FEATURE_DIR=str(self.work / "features"), CHECKPOINT_ROOT=str(self.work / "checkpoints"),
                     PROTOTYPE_DIR=str(self.work / "prototypes"), RESULT_ROOT=str(self.work),
                     GEN_FEATURE_DIR=str(self.work / "generic/features" / directory / self.name),
                     GEN_CHECKPOINT_DIR=str(self.work / "generic/checkpoints" / directory / self.name),
                     GEN_PROTO_DIR=str(self.work / "generic/prototypes" / directory / self.name),
                     RESULT_DIR=str(self.work / "generic" / dataset / method / self.name))
-                if directory in ("dyn3d", "dyn2d"):
+                if directory in ("S2S_R", "S2S_L"):
                     env["METHOD"] = method
                     filename = f"{self.name}_{dataset}_{method}_mc1.json"
                 elif directory == "l2s_linear":
@@ -185,16 +185,16 @@ class Plan:
                 self.add(f"generic-{self.name}-{dataset}-{method}",
                     ["bash", f"script/{directory}/{family}/generic/run_dataset.sh", dataset],
                     [Path(env["RESULT_DIR"]) / filename], env)
-                if directory == "dyn3d":
-                    cfg = ROOT / "hyperparams/dyn3d_sga" / family / "generic" / (dataset + ".sh")
+                if directory == "S2S_R":
+                    cfg = ROOT / "hyperparams/S2S_R" / family / "generic" / (dataset + ".sh")
                     match = re.search(r'LAYER="\$\{LAYER:-(\d+)\}"', cfg.read_text())
                     if not match:
                         raise ValueError("Cannot determine generic layer from " + str(cfg))
                     layer = int(match.group(1))
-                    ckpt = Path(env["GEN_CHECKPOINT_DIR"]) / f"{self.name}_{dataset}_l{layer}_dyn3d.npz"
+                    ckpt = Path(env["GEN_CHECKPOINT_DIR"]) / f"{self.name}_{dataset}_l{layer}_S2S_R.npz"
                     target = self.work / "generic" / dataset / "baseline" / self.name / "baseline.json"
                     self.add(f"generic-{self.name}-{dataset}-baseline", self.py(
-                        "method/dyn3d_sga/generic/evaluate_generic.py", "--model_name", self.name,
+                        "method/S2S_R/generic/evaluate_generic.py", "--model_name", self.name,
                         "--model_dir", self.model_dir, "--dataset", dataset, "--layer", layer,
                         "--checkpoint_path", ckpt, "--disable_steering", "--dtype", self.args.dtype,
                         "--seed", self.args.seed, "--output_path", target), [target])
@@ -202,8 +202,8 @@ class Plan:
     def gate(self):
         self.prepare()
         out = self.work / "gate" / self.name
-        self.add(f"gate-{self.name}", self.py("experiments/gate_correctness/evaluate.py",
-            "--model_name", self.name, "--model_dir", self.model_dir, "--checkpoint_dir", self.dyn_dir,
+        self.add(f"gate-{self.name}", self.py("experiments/rebuttal_R3Q3_candidate_gates/evaluate.py",
+            "--model_name", self.name, "--model_dir", self.model_dir, "--checkpoint_dir", self.s2s_r_dir,
             "--layer", self.layer, "--folds", *self.args.folds, "--margin", -0.7,
             "--weight_kappa", 3, "--dtype", self.args.dtype, "--seed", self.args.seed,
             "--output_dir", out), [out / "summary.json"])
@@ -215,12 +215,12 @@ class Plan:
             for margin in MARGINS:
                 tag = str(margin).replace("-", "m").replace(".", "p")
                 out = eval_root / self.name / f"fold{f}" / f"margin{tag}_eval.json"
-                self.add(f"margin-{self.name}-{f}-{tag}", self.entry("dyn3d_sga", "evaluate_3d_dyn.py",
-                    *self.common(f), "--dtype", self.args.dtype, "--checkpoint_path", self.dyn(f),
+                self.add(f"margin-{self.name}-{f}-{tag}", self.entry("S2S_R", "evaluate_S2S_R.py",
+                    *self.common(f), "--dtype", self.args.dtype, "--checkpoint_path", self.s2s(f),
                     "--weight_kappa", 3, "--margin", margin, "--output_path", out, "--save_details"), [out])
         out = self.work / "margin_gate" / self.name
-        self.add(f"margin-gate-{self.name}", self.py("experiments/margin_gate_correctness/evaluate.py",
-            "--model_name", self.name, "--model_dir", self.model_dir, "--checkpoint_dir", self.dyn_dir,
+        self.add(f"margin-gate-{self.name}", self.py("experiments/rebuttal_R3Q3_margin_gates/evaluate.py",
+            "--model_name", self.name, "--model_dir", self.model_dir, "--checkpoint_dir", self.s2s_r_dir,
             "--layer", self.layer, "--folds", *self.args.folds, "--margins", *MARGINS,
             "--eval_root", eval_root, "--dtype", self.args.dtype, "--seed", self.args.seed,
             "--output_dir", out), [out / "summary.json"])
@@ -232,11 +232,11 @@ class Plan:
             env = dict(FAMILY=self.args.model.upper(), MODEL_DIR_OVERRIDE=self.model_dir,
                 LLAMA_MODEL_DIR=self.model_dir, QWEN_MODEL_DIR=self.model_dir,
                 FOLD_IDX=str(f), FOLD_IDX_OVERRIDE=str(f), FEATURE_PATH=str(self.feature),
-                DYN_FEATURE_PATH=str(self.feature), RESULT_DIR=str(out), PYTHON_BIN=sys.executable,
+                S2S_FEATURE_PATH=str(self.feature), RESULT_DIR=str(out), PYTHON_BIN=sys.executable,
                 GPU=self.args.gpu, DEVICE=self.args.device, DTYPE=self.args.dtype, SEED=str(self.args.seed),
                 RUN_TRAIN="auto", NOISE_SEED=str(self.args.seed),
                 EPOCHS=str(self.args.epochs), NOISE_LEVELS="0 0.1 0.2 0.5 1 2 3 4 5")
-            self.add(f"noise-{self.name}-{f}", ["bash", "experiments/l2s_noise_robustness/run.sh"],
+            self.add(f"noise-{self.name}-{f}", ["bash", "experiments/fig5_target_noise/fig5_run.sh"],
                 [out / "mc1_by_noise.csv"], env)
 
     def bipo(self):
@@ -246,7 +246,7 @@ class Plan:
             raise ValueError("BiPO uses local_files_only: supply --model-dir with downloaded Llama weights")
         self.prepare(train=False)
         out = self.work / "bipo" / self.name
-        self.add("bipo-llama", self.py("experiments/bipo_truthfulqa/run.py", "--model-dir", self.model_dir,
+        self.add("bipo-llama", self.py("experiments/rebuttal_R2Q4_bipo/rebuttal_R2Q4_run.py", "--model-dir", self.model_dir,
             "--feature", self.feature, "--output", out, "--folds", *self.args.folds,
             "--seed", self.args.seed, "--epochs", self.args.bipo_epochs), [out / "performance.json"])
 
@@ -256,9 +256,12 @@ class Plan:
             out = self.work / "generation" / self.name / f"fold{f}"
             self.add(f"generation-{self.name}-{f}", self.py("reproducibility/generation.py",
                 "--model", self.model_dir, "--model-name", self.name, "--layer", self.layer,
-                "--s2s-checkpoint", self.dyn(f), "--l2s-checkpoint", self.l2s(f),
+                "--s2s-checkpoint", self.s2s(f), "--l2s-checkpoint", self.l2s(f),
+                "--spherical-prototype", self.prototype(f),
                 "--prompts", self.args.prompts or "data/mmsafe.jsonl", "--output-dir", out,
                 "--dtype", self.args.dtype, "--device", self.args.device,
+                "--l2s-alpha", (1.4 if self.args.model == "qwen" else 1.0),
+                "--margin", (-0.3 if self.args.model == "qwen" and f == 0 else -0.7),
                 "--max-new-tokens", 200, "--seed", self.args.seed), [out / "generations.jsonl"])
 
 
@@ -267,10 +270,10 @@ def build_plan(args):
         jobs = []
         for key in args.scaling_models:
             out = args.work_dir / "scaling" / key / ("nf4" if key == "qwen14" else "bfloat16")
-            cmd = [sys.executable, "experiments/model_scaling_ablation/run.py", "--model", key,
+            cmd = [sys.executable, "experiments/rebuttal_R1W2_model_scaling/rebuttal_R1W2_run.py", "--model", key,
                    "--output-dir", str(out), "--epochs", str(args.epochs), "--seed", str(args.seed)]
             if args.model_root:
-                from experiments.model_scaling_ablation.common import MODELS as entries
+                from experiments.rebuttal_R1W2_model_scaling.common import MODELS as entries
                 cmd += ["--model-dir", str(args.model_root / entries[key][0].split("/")[-1])]
             if key == "qwen14":
                 cmd += ["--load-in-4bit"]
@@ -343,7 +346,7 @@ def main():
                    default=["boolq", "copa", "storycloze", "mmlu_global", "winogrande"])
     p.add_argument("--model-dir", help="Local model directory, or official Hub ID except for BiPO")
     p.add_argument("--model-root", type=Path)
-    p.add_argument("--scaling-models", nargs="+", choices=SCALING, default=list(SCALING))
+    p.add_argument("--scaling-models", nargs="+", choices=SCALING, default=list(SCALING[:4]))
     p.add_argument("--folds", nargs="+", type=int, choices=[0, 1], default=[0, 1])
     p.add_argument("--work-dir", type=Path, default=Path("results/reproduction"))
     p.add_argument("--gpu", default="0")

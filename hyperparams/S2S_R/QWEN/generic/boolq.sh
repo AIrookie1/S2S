@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODEL_DIR_CONFIG="$(cd "$CONFIG_DIR/.." && pwd)"
+source "$MODEL_DIR_CONFIG/../common.sh"
+source "$MODEL_DIR_CONFIG/model.sh"
+DATASET="boolq"
+LAYER="${LAYER:-12}"
+GPU="${GPU:-0}"
+NUM_FOLDS="${NUM_FOLDS:-1}"
+FOLD_IDX="${FOLD_IDX:-0}"
+VAL_FRACTION="${VAL_FRACTION:-0.8}"
+MLP_HIDDEN="${MLP_HIDDEN:-256}"
+EPOCHS="${EPOCHS:-2000}"
+WEIGHT_KAPPA="${WEIGHT_KAPPA:-4}"
+MARGIN="${MARGIN:--0.8}"
+apply_S2S_R_common

@@ -38,7 +38,7 @@ class GenerationRuntimeTests(unittest.TestCase):
         import tempfile
         from pathlib import Path
         from reproducibility.prepare_additive import prepare
-        from method.dyn3d_sga.eval_utils import load_steering_vector
+        from method.S2S_R.eval_utils import load_steering_vector
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             # The held-out half has a deliberately enormous, different direction.

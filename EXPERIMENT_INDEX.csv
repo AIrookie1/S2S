@@ -1,0 +1,26 @@
+paper_or_rebuttal_id,directory,entrypoint,protocol_or_missing_input
+Table 1,table1_truthfulqa,MC: reproducibility.run main; generation: table1_run_generation.py,two_folds; baseline_additive_L2S_spherical_S2S_L_S2S_R_MC; generation_requires_judges
+Table 2,table2_generic_tasks,reproducibility.run generic,per_task_training; official_task_evaluation; native_task_epochs
+Table 3 / R3 Q2,table3_component_ablation,reproducibility.run component,both_folds; default_control_and_kappa2.5_margin0.965
+Table 4,table4_generation_efficiency,table4_run.sh,forced_50_final_tokens; throughput_not_EOS_behavior
+Figure 2(a),fig2a_oracle_vectors,evaluate_reference.py,label_informed_train_fold_reference; historical_curve_not_certified
+"Figure 2(b,c)",fig2bc_l2s_reliability,evaluate.py; fig2bc_plot.py,matched_L2S_training_questions; raw_pair_diagnostics
+Figure 3(a),fig3a_s2s_l_hyperparameters,fig3a_run.sh; fig3a_plot.sh,test_grid_sweep
+Figure 3(b),fig3b_hidden_size,fig3b_hidden_run.sh; fig3b_hidden_plot.sh,width16_to2048; both_folds
+Figure 3(b),fig3b_predictor_fraction,fig3b_fraction_run.sh; fig3b_fraction_plot.sh,fractions0.1_to0.9; seeds42_123_0; native_fold0
+Figure 3(c),fig3c_gate_margin,fig3c_margin_run.sh; fig3c_margin_plot.sh,unique_margins_include_default_and_closed_gate
+Figure 3(c),fig3c_weight_sharpness,fig3c_kappa_run.sh; fig3c_kappa_plot.sh,kappa0.5_1_2_4_8_16_32
+Figure 3(d),fig3d_adaptive_weights,fig3d_plot.sh,kappa1_5_10_20; token_weight_density
+"Figure 4(a,b)",fig4ab_residual_transfer,fig4ab_run.py,both_folds; oracle_conditions_are_diagnostics
+Figure 4(c) / Figure 5 left,external_vector_baselines,not_bundled,original_LoFiT_LoReFT_implementations_and_vector_artifacts_required
+Figure 5 middle,fig5_target_noise,reproducibility.run noise,training_target_noise; inference_noise_zero
+R1 W1 inference noise,rebuttal_R1W1_inference_noise,rebuttal_R1W1_run.py,clean_predictor; inference_direction_noise; historical_table_fold0
+R1 W2 / R2 W6,rebuttal_R1W2_model_scaling,rebuttal_R1W2_run.py; retune_spherical.py; compare_slerp.py,BF16_except_14B_NF4; per_fold_dev_selection
+R2 W5,rebuttal_R2W5_layer_sweep,run_llama.sh,test_set_sweep_best; not_dev_selected
+R2 Q4 / BiPO baseline,rebuttal_R2Q4_bipo,rebuttal_R2Q4_run.py; run_mlp_s2s.py,BiPO_alone_and_calibrated_variants; distinct_protocols
+R3 Q3,rebuttal_R3Q3_candidate_gates,reproducibility.run gate,teacher_forced_candidate_gates
+R3 Q3 margin,rebuttal_R3Q3_margin_gates,reproducibility.run margin,MC_and_label_conditioned_gate_rates
+R2 MMsafe / R3 generation,rebuttal_mmsafe,reproducibility.run generation; reproducibility.safety,original_prompt_data_and_safety_judge_required; text_adapter_only
+Supplement prediction errors,rebuttal_prediction_error,run_official.py; run_reliability.py,requires_generic_training_features_and_TruthfulQA_transfer_checkpoints
+R2 Q2 supplement,rebuttal_R2Q2_cross_task_transfer,rebuttal_R2Q2_run.sh,TruthfulQA_to_generic_transfer; distinct_from_Table2
+Supplement geometry,rebuttal_geometry_diagnostics,rebuttal_geometry_run.py,sampled_or_full_diagnostic; not_a_new_paper_number

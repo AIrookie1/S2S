@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 if [[ -z "${PYTHON_BIN:-}" ]]; then
-  if [[ -x /root/miniconda3/envs/py310/bin/python ]]; then PYTHON_BIN=/root/miniconda3/envs/py310/bin/python; else PYTHON_BIN=python; fi
+  if [[ -x python ]]; then PYTHON_BIN=python; else PYTHON_BIN=python; fi
 fi
 FEATURE_DIR="${FEATURE_DIR:-$REPO_ROOT/features}"
 CHECKPOINT_ROOT="${CHECKPOINT_ROOT:-$REPO_ROOT/checkpoints}"

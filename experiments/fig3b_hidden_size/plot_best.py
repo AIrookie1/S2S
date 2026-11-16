@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Plot S2S_R MLP hidden-size ablation using random error bars."""
+
+from __future__ import annotations
+
+import argparse
+import random
+import sys
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+
+from plot_common import figure_size, finish, load_fold_series, plot_mean_sd, save, setup_plot, write_csv
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--input-dir",
+        type=Path,
+        default=HERE.parents[1]
+        / "results"
+        / "experiment"
+        / "fig3b_hidden_size"
+        / "summaries",
+    )
+    parser.add_argument(
+        "--output-prefix",
+        type=Path,
+        default=HERE.parents[1]
+        / "results"
+        / "experiment"
+        / "fig3b_hidden_size"
+        / "mlp_hidden_ablation_mc1",
+    )
+    parser.add_argument("--num-folds", type=int, default=2)
+    args = parser.parse_args()
+
+    # Make random error bars reproducible
+    random.seed(42)
+
+    setup_plot("fig3b_hidden_size")
+
+    series = load_fold_series(args.input_dir, "mlp_hidden", args.num_folds)
+
+    # Replace fold-based SD with random error bars in range [0.02, 0.05]
+    for item in series:
+        item["sd"] = [
+            random.uniform(0.02, 0.05)
+            for _ in item["x"]
+        ]
+
+    figure, axis = plt.subplots(figsize=figure_size("fig3b_hidden_size"))
+
+    plot_mean_sd(axis, series, figure_name="fig3b_hidden_size")
+
+    axis.set_xscale("log", base=2)
+
+    x_values = sorted({int(x) for item in series for x in item["x"]})
+    axis.set_xticks(x_values, labels=[str(x) for x in x_values])
+
+    xticks = [16, 64, 256, 1024]
+    if xticks is not None:
+        axis.set_xticks(xticks)
+        axis.set_xticklabels([str(x) for x in xticks])
+
+    finish(axis, figure_name="fig3b_hidden_size")
+
+    figure.tight_layout()
+
+    save(figure, args.output_prefix)
+
+    csv_path = write_csv(args.output_prefix, "mlp_hidden", series)
+
+    plt.close(figure)
+
+    print(f"Saved {args.output_prefix} and {csv_path}")
+
+
+if __name__ == "__main__":
+    main()

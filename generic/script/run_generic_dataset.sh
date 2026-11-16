@@ -15,10 +15,10 @@ esac
 
 case "$METHOD" in
   S2S_L|S2S_L_Static)
-    exec bash "$REPO_ROOT/script/dyn2d/$MODEL_FAMILY/generic/run_dataset.sh" "$DATASET"
+    exec bash "$REPO_ROOT/script/S2S_L/$MODEL_FAMILY/generic/run_dataset.sh" "$DATASET"
     ;;
   S2S_R|S2S_R_Static)
-    exec bash "$REPO_ROOT/script/dyn3d/$MODEL_FAMILY/generic/run_dataset.sh" "$DATASET"
+    exec bash "$REPO_ROOT/script/S2S_R/$MODEL_FAMILY/generic/run_dataset.sh" "$DATASET"
     ;;
   L2S_LINEAR|L2S-LINEAR|l2s_linear|l2s-linear)
     exec bash "$REPO_ROOT/script/l2s_linear/$MODEL_FAMILY/generic/run_dataset.sh" "$DATASET"

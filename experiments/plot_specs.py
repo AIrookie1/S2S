@@ -15,7 +15,7 @@ from plot_sizes import get_size
 
 
 FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
-    "gate_correctness": {
+    "rebuttal_R3Q3_candidate_gates": {
         "size": "half_quarter",
         "style": "quarter_quarter",
         "text": {"ylabel": "Gate trigger rate (%)", "correct": "Correct candidates",
@@ -23,21 +23,21 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
                  "observe": "Observe only"},
         "legend": {"loc": "upper center", "ncol": 2, "bbox_to_anchor": (0.5, 1.2)},
     },
-    "margin_ablation": {
+    "fig3c_gate_margin": {
         "size": "half_quarter",
         "style": "half_quarter",
         "text": {"xlabel": "Margin threshold", "ylabel": "MC1", "title": None},
         "show": {"xlabel": True, "ylabel": True, "title": False, "legend": True},
         "legend": {"loc": "best"},
     },
-    "weight_kappa_ablation": {
+    "fig3c_weight_sharpness": {
         "size": "half_quarter",
         "style": "half_quarter",
         "text": {"xlabel": "Steering strength kappa", "ylabel": "MC1", "title": None},
         "show": {"xlabel": True, "ylabel": True, "title": False, "legend": True},
         "legend": {"loc": "best"},
     },
-    "mlp_hidden_ablation": {
+    "fig3b_hidden_size": {
         "size": "quarter_quarter",
         "style": "quarter_quarter",
         "text": {"xlabel": "MLP hidden size", "ylabel": "MC1", "title": None},
@@ -45,15 +45,15 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
         "legend": {"loc": "best"},
         "xticks": [16, 64, 256, 1024, 2048],
     },
-    "val_fraction_ablation": {
+    "fig3b_predictor_fraction": {
         "size": "quarter_quarter",
         "style": "quarter_quarter",
         "text": {"xlabel": "Validation fraction", "ylabel": "MC1", "title": None},
         "show": {"xlabel": True, "ylabel": True, "title": False, "legend": True},
         "legend": {"loc": "best"},
     },
-    "steering_vector_ablation": {
-        "size": "steering_vector_ablation",
+    "fig2a_oracle_vectors": {
+        "size": "fig2a_oracle_vectors",
         "style": "steering_vector",
         "text": {
             "xlabel": "layer",
@@ -82,13 +82,13 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
         },
         "layout": {"left": 0.115, "right": 0.988, "bottom": 0.225, "top": 0.97},
     },
-    "dyn2d_heatmap": {
-        "size": "dyn2d_heatmap",
+    "S2S_L_heatmap": {
+        "size": "S2S_L_heatmap",
         "style": "heatmap",
         "text": {
             "xlabel": "Steering strength",
             "ylabel": "SLERP coefficient",
-            "title": "Dyn2D Ablation: TruthfulQA MC1 (fold mean)",
+            "title": "S2S_L Ablation: TruthfulQA MC1 (fold mean)",
             "colorbar": "MC1",
         },
         "show": {
@@ -100,8 +100,8 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
         },
         "heatmap": {"cmap": "viridis", "value_format": ".3f"},
     },
-    "kappa_view": {
-        "size": "kappa_view",
+    "fig3d_adaptive_weights": {
+        "size": "fig3d_adaptive_weights",
         "style": "quarter_quarter",
         "text": {"title": None},
         "show": {
@@ -159,8 +159,8 @@ FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
         "legend": {"loc": "upper right", "ncol": 2},
         "layout": {"left": 0.18, "right": 0.985, "bottom": 0.19, "top": 0.94},
     },
-    "residual_analysis": {
-        "size": "residual_analysis",
+    "fig4ab_residual_transfer": {
+        "size": "fig4ab_residual_transfer",
         "style": "compact",
         "text": {
             "panel_a_ylabel": "Cosine similarity to oracle residual",

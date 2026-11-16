@@ -16,9 +16,9 @@ case "$METHOD" in
 esac
 
 # Generic answer-level features are method-agnostic. Reuse the canonical
-# Dyn3D generic feature directory by default so L2S and Dyn3D see identical
+# S2S_R generic feature directory by default so L2S and S2S_R see identical
 # hidden states; set GEN_FEATURE_DIR to isolate them if desired.
-GEN_FEATURE_DIR="${GEN_FEATURE_DIR:-$FEATURE_DIR/generic/dyn3d_sga/$MODEL}"
+GEN_FEATURE_DIR="${GEN_FEATURE_DIR:-$FEATURE_DIR/generic/S2S_R/$MODEL}"
 GEN_CHECKPOINT_DIR="${GEN_CHECKPOINT_DIR:-$CHECKPOINT_ROOT/generic/l2s_linear/$MODEL}"
 RESULT_DIR="${RESULT_DIR:-$RESULT_ROOT/generic/$DATASET/l2s_linear}"
 RUN_EXTRACT="${RUN_EXTRACT:-auto}"

@@ -39,7 +39,7 @@ class ReleaseLayoutTests(unittest.TestCase):
     def test_retired_method_labels_are_absent(self):
         retired = re.compile(r"dyn[23]d|[23]d[_-]dyn", re.I)
         for path in ROOT.rglob("*"):
-            if any(x in (".git", "__pycache__", ".pytest_cache") for x in path.parts):
+            if any(x in (".git", "__pycache__", ".pytest_cache", "models", "results", "features", "checkpoints", "prototypes", ".venv", ".venv-scaling") for x in path.parts):
                 continue
             self.assertIsNone(retired.search(str(path.relative_to(ROOT))), str(path.relative_to(ROOT)))
             if path.is_file() and path.suffix in (".py", ".sh", ".md", ".json", ".csv", ".yml", ".ini"):

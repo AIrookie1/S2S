@@ -29,12 +29,12 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument(
         "--method-dir",
-        default="dyn3d_sga",
-        help="方法名：dyn3d_sga（Similarity-Graph Adaptive 3D Steering）",
+        default="S2S_R",
+        help="方法名：S2S_R（S2S_R）",
     )
     parser.add_argument(
         "--entry-file",
-        default="evaluate_3d_dyn.py",
+        default="evaluate_S2S_R.py",
         help="要运行的 Python 文件名",
     )
 
@@ -57,12 +57,8 @@ def main() -> None:
     if not entry_file.endswith(".py"):
         entry_file += ".py"
 
-    aliases = {
-        "3d-dyn": "dyn3d_sga",
-        "dyn3d": "dyn3d_sga",
-        "sga-2slerp": "dyn3d_sga",
-    }
-    method = aliases.get(launcher_args.method_dir.lower(), launcher_args.method_dir.lower())
+    method_names = {"s2s_l": "S2S_L", "s2s_r": "S2S_R"}
+    method = method_names.get(launcher_args.method_dir.casefold(), launcher_args.method_dir)
     target_path = (project_root / "method" / method / entry_file).resolve()
 
     if not target_path.is_file():
