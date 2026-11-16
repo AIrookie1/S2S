@@ -6,8 +6,8 @@ source "$REPO_ROOT/hyperparams/dyn3d_sga/LLAMA/truthfulqa.sh"
 source "$REPO_ROOT/script/common.sh"
 
 # Paper Table 3 is intentionally fold 0 only.
-FOLD_IDX=0
-GPU="${GPU:-0}"
+FOLD_IDX=1
+GPU="${GPU:-2}"
 CHECKPOINT_PATH="${CHECKPOINT_PATH:-$CHECKPOINT_ROOT/dyn3d_sga/truthfulqa/$MODEL/${MODEL}_layer${LAYER}_dynMLP_fold${FOLD_IDX}_${POSITIVE_MODE}.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-$RESULT_ROOT/experiment/component_ablation/$MODEL/fold${FOLD_IDX}}"
 
@@ -22,7 +22,7 @@ ARGS=(
   --model_dir "$MODEL_DIR"
   --checkpoint_path "$CHECKPOINT_PATH"
   --layer "$LAYER"
-  --expected_fold 0
+  --expected_fold 1
   --eval_split test
   --single_slerp_t 0.4
   --fixed_weights 0.6 0.3 0.1
@@ -40,4 +40,4 @@ ARGS=(
 [[ -n "${MAX_SAMPLES:-}" ]] && ARGS+=(--max_samples "$MAX_SAMPLES")
 
 cd "$REPO_ROOT"
-PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" "$HERE/evaluate.py" "${ARGS[@]}"
+PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES="$GPU" "$PYTHON_BIN" "$HERE/evaluate.py" "${ARGS[@]}" "$@"

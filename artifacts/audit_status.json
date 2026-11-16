@@ -1,0 +1,10 @@
+{
+  "record_count": 666,
+  "validation_errors": [],
+  "model_execution": "not_performed",
+  "unresolved_claims": [
+    "qwen3_s2sl_table_b",
+    "qwen14_s2sl_table_b",
+    "review_bipo"
+  ]
+}

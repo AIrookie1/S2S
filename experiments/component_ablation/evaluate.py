@@ -3,13 +3,16 @@
 
 This experiment intentionally lives outside ``method/`` so the released method
 implementation remains unchanged.  The full row delegates to the current
-``get_3d_dynamic_intervention`` hook verbatim; the four ablated rows reuse the
+``get_3d_dynamic_intervention`` hook verbatim; the ablated rows reuse the
 same current primitives and checkpoint.
 
 Rows (all evaluated on the checkpoint's held-out split):
 
 1. MLP x, S2S x, AW x, Margin x:
    SLERP(normalize(h), normalize(v_avg), t=0.4), restore ||h||.
+   Additional mean-only control (vavg_aw_gate): MLP x, S2S x, AW y, Margin y.
+   Set both graph steering nodes to normalize(v_avg), merge their weights,
+   then use a single weighted SLERP with the mean-vs-hidden margin gate.
 2. MLP y, S2S x, AW x, Margin x:
    predict v_hat from the segment's last position, then
    SLERP(normalize(h), normalize(v_hat), t=0.4), restore ||h||.
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import sys
@@ -41,6 +45,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from method.dyn3d_sga.dyn_mlp import predict_residual
+from method.dyn2d.steering import slerp as stable_single_slerp
 from method.dyn3d_sga.evaluate_dyn_mlp import load_components
 from method.dyn3d_sga.evaluate_3d_dyn import (
     adaptive_3way_weights,
@@ -65,6 +70,7 @@ from truthfulqa.models import MC_calcs, set_columns
 
 VARIANTS = (
     "vavg",
+    "vavg_aw_gate",
     "mlp",
     "s2s_fixed",
     "s2s_adaptive",
@@ -73,6 +79,7 @@ VARIANTS = (
 
 VARIANT_META = {
     "vavg": {"MLP": False, "S2S": False, "AW": False, "Margin Gate": False},
+    "vavg_aw_gate": {"MLP": False, "S2S": False, "AW": True, "Margin Gate": True},
     "mlp": {"MLP": True, "S2S": False, "AW": False, "Margin Gate": False},
     "s2s_fixed": {"MLP": True, "S2S": True, "AW": False, "Margin Gate": False},
     "s2s_adaptive": {"MLP": True, "S2S": True, "AW": True, "Margin Gate": False},
@@ -110,6 +117,8 @@ def get_ablation_intervention(
     if not math.isfinite(single_slerp_t) or not 0.0 <= single_slerp_t <= 1.0:
         raise ValueError("single_slerp_t must be finite and in [0,1]")
     _validate_fixed_weights(fixed_weights)
+    if variant == "vavg_aw_gate" and not math.isfinite(margin):
+        raise ValueError("margin must be finite")
 
     if variant == "s2s_full":
         return get_3d_dynamic_intervention(
@@ -145,6 +154,7 @@ def get_ablation_intervention(
         ).clamp_min(eps)
         x = norm(original, eps)
         token_count = int(original.shape[0] * original.shape[1])
+        should_steer = torch.ones_like(x[..., :1], dtype=torch.bool)
 
         if variant == "vavg":
             target = mean_direction.view(1, 1, -1).expand_as(x)
@@ -156,6 +166,21 @@ def get_ablation_intervention(
                 small_angle_threshold,
             )
             alpha = beta = gamma = None
+
+        elif variant == "vavg_aw_gate":
+            # No predictor/residual: both steering nodes carry the mean.
+            # Merge their mass into beta so alpha + beta = 1 and gamma = 0.
+            target = mean_direction.view(1, 1, -1).expand_as(x)
+            alpha, mean_weight, duplicate_weight, _ = adaptive_3way_weights(
+                x, target, target, kappa=weight_kappa, temperature=1.0
+            )
+            beta = mean_weight + duplicate_weight
+            gamma = torch.zeros_like(alpha)
+            rotated_direction = stable_single_slerp(
+                x, target, beta, eps=eps,
+                small_angle_threshold=small_angle_threshold,
+            )
+            should_steer = beta > (alpha + margin)
 
         elif variant == "mlp":
             # Match current S2S-R sequence semantics: predict once from the
@@ -205,12 +230,13 @@ def get_ablation_intervention(
 
         candidate = rotated_direction * original_norm
         edited = hidden.clone()
-        # All four ablated rows have no margin gate by experimental design.
-        edited[:, start:, :] = candidate.to(hidden.dtype)
+        edited[:, start:, :] = torch.where(
+            should_steer, candidate, original
+        ).to(hidden.dtype)
 
         if stats is not None:
             stats["total"] = stats.get("total", 0) + token_count
-            stats["steered"] = stats.get("steered", 0) + token_count
+            stats["steered"] = stats.get("steered", 0) + int(should_steer.sum().item())
             if alpha is not None:
                 stats["weight_count"] = stats.get("weight_count", 0) + token_count
                 stats["alpha_sum"] = stats.get("alpha_sum", 0.0) + float(alpha.sum().item())
@@ -416,10 +442,22 @@ def main() -> None:
     parser.add_argument("--slerp_eps", type=float, default=1e-8)
     parser.add_argument("--small_angle_threshold", type=float, default=1e-4)
     parser.add_argument("--variants", nargs="+", choices=VARIANTS, default=list(VARIANTS))
+    parser.add_argument("--vavg_kappas", type=float, nargs="+", default=None,
+                        help="Joint mean-only sweep; requires --vavg_margins.")
+    parser.add_argument("--vavg_margins", type=float, nargs="+", default=None)
+    parser.add_argument("--selection_metric", choices=["MC1", "MC2", "MC3", "Avg"], default="MC1")
+    parser.add_argument("--resume", action="store_true", help="Reuse matching completed mean-only grid cells.")
     parser.add_argument("--max_samples", type=int, default=None, help="Debug only; official run leaves this unset.")
     parser.add_argument("--save_details", action="store_true")
     parser.add_argument("--output_dir", type=Path, default=ROOT / "results" / "experiment" / "component_ablation")
     args = parser.parse_args()
+
+    sweep = args.vavg_kappas is not None or args.vavg_margins is not None
+    if sweep:
+        from experiments.component_ablation.vavg_grid import validate_grid
+        validate_grid(args.vavg_kappas, args.vavg_margins)
+        if args.variants != ["vavg_aw_gate"]:
+            parser.error("mean-only grid requires --variants vavg_aw_gate")
 
     _validate_fixed_weights(tuple(args.fixed_weights))
     set_seed(args.seed)
@@ -469,6 +507,49 @@ def main() -> None:
         ids = set(int(x) for x in np.asarray(checkpoint[key]).reshape(-1))
 
     layer_name = get_layer_name(args.model_name, args.layer)
+    if sweep:
+        from experiments.component_ablation.vavg_grid import run_grid
+
+        checkpoint_path = Path(args.checkpoint_path).resolve()
+        context = {
+            "variant": "vavg_aw_gate", "model_name": args.model_name,
+            "model_path": str(Path(model_path).resolve()), "layer": args.layer,
+            "fold_idx": actual_fold, "eval_split": args.eval_split,
+            "question_ids": sorted(int(i) for i in dataframe.loc[
+                dataframe["hf_idx"].isin(ids), "hf_idx"
+            ].iloc[:args.max_samples]),
+            "checkpoint_path": str(checkpoint_path),
+            "checkpoint_sha256": hashlib.sha256(checkpoint_path.read_bytes()).hexdigest(),
+            "csv_sha256": hashlib.sha256(Path(args.csv_path).read_bytes()).hexdigest(),
+            "code_sha256": hashlib.sha256(b"".join(p.read_bytes() for p in (
+                Path(__file__), ROOT / "experiments/component_ablation/vavg_grid.py",
+                ROOT / "method/dyn3d_sga/evaluate_3d_dyn.py",
+                ROOT / "method/dyn2d/steering.py", ROOT / "method/dyn3d_sga/eval_utils.py",
+            ))).hexdigest(),
+            "seed": args.seed, "device": str(device), "dtype": args.dtype,
+            "few_shot": args.few_shot, "preset": args.preset,
+            "no_instruction": args.no_instruction, "max_samples": args.max_samples,
+            "slerp_eps": args.slerp_eps, "small_angle_threshold": args.small_angle_threshold,
+        }
+
+        def evaluate_cell(kappa, margin):
+            cell_args = argparse.Namespace(**vars(args))
+            cell_args.weight_kappa, cell_args.margin = kappa, margin
+            set_seed(args.seed)
+            return _evaluate_variant(
+                variant="vavg_aw_gate", dataframe=dataframe, ids=ids,
+                model=model, tokenizer=tokenizer, avg=avg, predictor=None,
+                args=cell_args, layer_name=layer_name,
+            )
+
+        best = run_grid(kappas=args.vavg_kappas, margins=args.vavg_margins,
+                        output_dir=args.output_dir, context=context, evaluate=evaluate_cell,
+                        selection_metric=args.selection_metric, resume=args.resume,
+                        save_details=args.save_details)
+        print(f"Best {args.selection_metric}: kappa={best['weight_kappa']} "
+              f"margin={best['margin']} MC1={best['MC1']:.6f} Avg={best['Avg']:.6f}")
+        return
+
     rows = []
     args.output_dir.mkdir(parents=True, exist_ok=True)
     details_dir = args.output_dir / "details"
@@ -509,6 +590,11 @@ def main() -> None:
             "weight_kappa": float(args.weight_kappa),
             "margin": float(args.margin),
             "avg": "(MC1 + MC2 + MC3) / 3",
+            "vavg_aw_gate": (
+                "(alpha,b1,b2)=adaptive_3way_weights(X,V,V); "
+                "beta=b1+b2, gamma=0; SLERP(X,V,beta), restore ||h||; "
+                "steer iff beta > alpha + margin; no MLP or residual"
+            ),
             "full_row": "delegates to current method/dyn3d_sga/evaluate_3d_dyn.py",
         },
     }

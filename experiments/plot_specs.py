@@ -15,6 +15,14 @@ from plot_sizes import get_size
 
 
 FIGURE_SPECS: Final[dict[str, dict[str, Any]]] = {
+    "gate_correctness": {
+        "size": "half_quarter",
+        "style": "quarter_quarter",
+        "text": {"ylabel": "Gate trigger rate (%)", "correct": "Correct candidates",
+                 "incorrect": "Incorrect candidates", "apply": "Steering applied",
+                 "observe": "Observe only"},
+        "legend": {"loc": "upper center", "ncol": 2, "bbox_to_anchor": (0.5, 1.2)},
+    },
     "margin_ablation": {
         "size": "half_quarter",
         "style": "half_quarter",

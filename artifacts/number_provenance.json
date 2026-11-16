@@ -1,0 +1,273 @@
+{
+  "claims": [
+    {
+      "claim_id": "qwen3_s2sl_table_a",
+      "claimed_MC1_percent": 32.68,
+      "status": "matching_artifact_found",
+      "matches": [
+        {
+          "evidence_id": "167dbe5edef55957",
+          "source": "results/experiment/model_scaling_ablation/Qwen2.5-3B-Instruct/bfloat16/summary.json",
+          "model": "Qwen/Qwen2.5-3B-Instruct",
+          "method": "s2s_l",
+          "fold": null,
+          "context": {
+            "repo_id": "Qwen/Qwen2.5-3B-Instruct",
+            "revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+            "dtype": "bfloat16",
+            "load_in_4bit": false,
+            "layer": 22,
+            "seed": 42,
+            "selection": "dev_MC1_then_MC2_then_grid_order",
+            "prompt": "repository_zero_shot_instruction_no_chat_template",
+            "s2s_l_variant": "S2S-L (current get_2d_dynamic_intervention)"
+          },
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "claim_id": "qwen3_s2sl_table_b",
+      "claimed_MC1_percent": 36.68,
+      "status": "unresolved_no_matching_audited_artifact",
+      "matches": []
+    },
+    {
+      "claim_id": "qwen14_s2sl_table_a",
+      "claimed_MC1_percent": 44.68,
+      "status": "matching_artifact_found",
+      "matches": [
+        {
+          "evidence_id": "862f6e371e88be59",
+          "source": "results/experiment/model_scaling_ablation/Qwen2.5-14B-Instruct/nf4/summary.json",
+          "model": "Qwen/Qwen2.5-14B-Instruct",
+          "method": "s2s_l",
+          "fold": null,
+          "context": {
+            "repo_id": "Qwen/Qwen2.5-14B-Instruct",
+            "revision": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+            "dtype": "bfloat16",
+            "load_in_4bit": true,
+            "layer": 32,
+            "seed": 42,
+            "selection": "dev_MC1_then_MC2_then_grid_order",
+            "prompt": "repository_zero_shot_instruction_no_chat_template",
+            "s2s_l_variant": "S2S-L (current get_2d_dynamic_intervention)"
+          },
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "claim_id": "qwen14_s2sl_table_b",
+      "claimed_MC1_percent": 48.29,
+      "status": "unresolved_no_matching_audited_artifact",
+      "matches": []
+    },
+    {
+      "claim_id": "llama_noise_s2sl",
+      "claimed_MC1_percent": 49.02,
+      "status": "matching_artifact_found",
+      "matches": [
+        {
+          "evidence_id": "b661643b470fe64c",
+          "source": "results/truthfulqa/S2S_L_Static/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold0_S2S_L_Static_strength3.0_slerp0.2_mc.json",
+          "model": "llama3.1-8B-Instruct",
+          "method": "s2s_l",
+          "fold": 0,
+          "context": {
+            "parameters": {
+              "strength": 3.0,
+              "slerp_t": 0.2,
+              "few_shot": false,
+              "preset": "qa",
+              "steering_enabled": true
+            },
+            "layer": 14,
+            "eval_split": "test",
+            "definition": {
+              "V": "normalize(v_avg)",
+              "R": "normalize(v_hat - v_avg)",
+              "D": "SLERP(V, R, slerp_t)",
+              "D_scaled": "D * ||v_hat||_2",
+              "intervention": "h_new = h + strength * D_scaled"
+            }
+          },
+          "parameters": {
+            "strength": 3.0,
+            "slerp_t": 0.2,
+            "few_shot": false,
+            "preset": "qa",
+            "steering_enabled": true
+          }
+        },
+        {
+          "evidence_id": "5e0e777cad12e5aa",
+          "source": "results/truthfulqa/dyn2d/llama3.1-8B-Instruct/llama3.1-8B-Instruct_l14_fold0_strength3.0_slerp0.2_mc.json",
+          "model": "llama3.1-8B-Instruct",
+          "method": "s2s_l",
+          "fold": 0,
+          "context": {
+            "parameters": {
+              "strength": 3.0,
+              "slerp_t": 0.2,
+              "few_shot": false,
+              "preset": "qa",
+              "steering_enabled": true
+            },
+            "layer": 14,
+            "eval_split": "test",
+            "definition": {
+              "V": "normalize(v_avg)",
+              "R": "normalize(v_hat - v_avg)",
+              "D": "SLERP(V, R, slerp_t)",
+              "D_scaled": "D * ||v_hat||_2",
+              "intervention": "h_new = h + strength * D_scaled"
+            }
+          },
+          "parameters": {
+            "strength": 3.0,
+            "slerp_t": 0.2,
+            "few_shot": false,
+            "preset": "qa",
+            "steering_enabled": true
+          }
+        },
+        {
+          "evidence_id": "56b23fcc2dffb104",
+          "source": "results/experiment/l2s_noise_robustness/llama3.1-8B-Instruct/fold0/noise_0/s2s_l_static.json",
+          "model": "llama3.1-8B-Instruct",
+          "method": "s2s_l",
+          "fold": 0,
+          "context": {
+            "parameters": {
+              "strength": 3.0,
+              "slerp_t": 0.2,
+              "few_shot": false,
+              "preset": "qa",
+              "steering_enabled": true,
+              "residual_noise_sigma": 0.0,
+              "residual_noise_seed": 42
+            },
+            "layer": 14,
+            "eval_split": "test",
+            "definition": {
+              "V": "normalize(v_avg)",
+              "R": "normalize(v_hat - v_avg)",
+              "D": "SLERP(V, R, slerp_t)",
+              "D_scaled": "D * ||v_hat||_2",
+              "intervention": "h_new = h + strength * D_scaled"
+            }
+          },
+          "parameters": {
+            "strength": 3.0,
+            "slerp_t": 0.2,
+            "few_shot": false,
+            "preset": "qa",
+            "steering_enabled": true,
+            "residual_noise_sigma": 0.0,
+            "residual_noise_seed": 42
+          }
+        },
+        {
+          "evidence_id": "e97930410a9837ce",
+          "source": "results/experiment/l2s_noise_robustness/llama3.1-8B-Instruct/fold0/noise_1p0/s2s_l_static.json",
+          "model": "llama3.1-8B-Instruct",
+          "method": "s2s_l",
+          "fold": 0,
+          "context": {
+            "parameters": {
+              "strength": 3.0,
+              "slerp_t": 0.2,
+              "few_shot": false,
+              "preset": "qa",
+              "steering_enabled": true,
+              "residual_noise_sigma": 1.0,
+              "residual_noise_seed": 42
+            },
+            "layer": 14,
+            "eval_split": "test",
+            "definition": {
+              "V": "normalize(v_avg)",
+              "R": "normalize(v_hat - v_avg)",
+              "D": "SLERP(V, R, slerp_t)",
+              "D_scaled": "D * ||v_hat||_2",
+              "intervention": "h_new = h + strength * D_scaled"
+            }
+          },
+          "parameters": {
+            "strength": 3.0,
+            "slerp_t": 0.2,
+            "few_shot": false,
+            "preset": "qa",
+            "steering_enabled": true,
+            "residual_noise_sigma": 1.0,
+            "residual_noise_seed": 42
+          }
+        }
+      ]
+    },
+    {
+      "claim_id": "q2_fold1_mean_control",
+      "claimed_MC1_percent": 38.88,
+      "status": "matching_artifact_found",
+      "matches": [
+        {
+          "evidence_id": "279d0b72124c6fdc",
+          "source": "results/experiment/component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/grid_summary.json",
+          "model": "llama3.1-8B-Instruct",
+          "method": "vavg_aw_gate",
+          "fold": 1,
+          "context": {
+            "layer": 14,
+            "eval_split": "test",
+            "seed": 42
+          },
+          "parameters": {
+            "weight_kappa": 2.5,
+            "margin": 0.965
+          }
+        },
+        {
+          "evidence_id": "c7bb7ade705099a0",
+          "source": "results/experiment/component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/refine_kappa2.5/cells/kappa2.5_margin0.965.json",
+          "model": "llama3.1-8B-Instruct",
+          "method": "vavg_aw_gate",
+          "fold": 1,
+          "context": {
+            "layer": 14,
+            "eval_split": "test",
+            "seed": 42
+          },
+          "parameters": {
+            "weight_kappa": 2.5,
+            "margin": 0.965
+          }
+        },
+        {
+          "evidence_id": "b92c893d0c448447",
+          "source": "results/experiment/component_ablation/llama3.1-8B-Instruct/fold1_vavg_targeted/refine_kappa2.5/grid_summary.json",
+          "model": "llama3.1-8B-Instruct",
+          "method": "vavg_aw_gate",
+          "fold": 1,
+          "context": {
+            "layer": 14,
+            "eval_split": "test",
+            "seed": 42
+          },
+          "parameters": {
+            "weight_kappa": 2.5,
+            "margin": 0.965
+          }
+        }
+      ]
+    },
+    {
+      "claim_id": "review_bipo",
+      "claimed_MC1_percent": 60.18,
+      "status": "unresolved_no_matching_audited_artifact",
+      "matches": []
+    }
+  ],
+  "note": "A numerical match is evidence of a configuration, not proof of which response table was intended."
+}

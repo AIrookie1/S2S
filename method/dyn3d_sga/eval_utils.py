@@ -88,6 +88,8 @@ def set_seed(seed: int) -> None:
 def get_instruction(model_name: str | None = None) -> str:
     if model_name and "qwen" in model_name.lower():
         return INSTRUCTION_QWEN
+    if model_name and "nemotron" in model_name.lower():
+        return INSTRUCTION_QWEN
     return INSTRUCTION_DEFAULT
 
 

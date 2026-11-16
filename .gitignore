@@ -29,3 +29,12 @@ experiments/*.svg
 experiments/*.csv
 experiments/*.json
 experiments/*.log
+
+# Anonymous source exports and local-only reproduction inputs
+anonymous_release*/
+.anonymous-build-*/
+.venv*/
+.env
+.env.*
+models/
+data/

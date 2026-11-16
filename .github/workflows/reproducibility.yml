@@ -1,0 +1,20 @@
+name: Reproduction and privacy checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  lightweight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: python -m unittest discover -s reproducibility/tests -v
+      - run: python -m reproducibility.run main --model llama > /tmp/main-plan.json
+      - run: python -m reproducibility.run component --model qwen > /tmp/control-plan.json
+      - run: python -m reproducibility.privacy . --allow-git
+      - run: python -m compileall -q method generic experiments reproducibility tools truthfulqa
+# Full evaluations require separately downloaded model weights and a CUDA host.
