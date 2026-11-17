@@ -1,4 +1,4 @@
-"""Run the requested 6x6 S2S_L TruthfulQA MC ablation in one model process."""
+"""Run the requested S2S_L TruthfulQA MC grid in one model process."""
 from __future__ import annotations
 
 import argparse

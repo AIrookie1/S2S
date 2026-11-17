@@ -78,14 +78,14 @@ def summarize():
     with (OUT / 'comparison.csv').open('w') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
     def score(x):
-        return '待完成' if x is None else f'{100*x:.2f}'
-    lines = ['| 模型 | 最优权重 t | MC1 (%) | t=0.2 | MC1 (%) | t=0.4 | MC1 (%) |',
+        return 'pending' if x is None else f'{100*x:.2f}'
+    lines = ['| Model | Best t | MC1 (%) | t=0.2 | MC1 (%) | t=0.4 | MC1 (%) |',
              '|---|---:|---:|---:|---:|---:|---:|']
     for r in rows:
-        lines.append(f"| {r['model']} | {r['best_t']} | {score(r['best_MC1'])} | 0.2 (s={r['strength_t0.2'] or '待完成'}) | {score(r['MC1_t0.2'])} | 0.4 (s={r['strength_t0.4'] or '待完成'}) | {score(r['MC1_t0.4'])} |")
-    lines += ['', '每个固定 t 重新选择 strength；s 为 strength，a / b 表示 fold 0 / fold 1。',
-              '所有 MC1 均按两折题数加权；14B 保持 NF4，其余保持原精度。',
-              '规模实验：strength 候选 [0.5, 1.0, 2.0, 3.0]，每折在原 dev 集选择；最优权重在原 dev 网格与新增 t=0.4 候选的并集上选择，不按 test 分数重选。7B/8B：复用已有测试集网格（strength=1..6），属于测试集网格最优，未与 dev 选择混称。', '',
+        lines.append(f"| {r['model']} | {r['best_t']} | {score(r['best_MC1'])} | 0.2 (s={r['strength_t0.2'] or 'pending'}) | {score(r['MC1_t0.2'])} | 0.4 (s={r['strength_t0.4'] or 'pending'}) | {score(r['MC1_t0.4'])} |")
+    lines += ['', 'Strength is selected independently for each fixed t; a / b denote fold 0 / fold 1.',
+              'MC1 values are weighted by the number of questions in each fold; 14B uses NF4 and other models retain their declared precision.',
+              'Scaling experiment: strength candidates [0.5, 1.0, 2.0, 3.0] are selected on the original dev split; best t is selected from the union of the original dev grid and added t=0.4 candidates. 7B/8B reuse their existing test-grid optima.', '',
               'Strength: ' + '; '.join(f"{r['model']}={r['strength']}" for r in rows)]
     (OUT / 'comparison.md').write_text('\n'.join(lines) + '\n')
     return rows

@@ -43,7 +43,7 @@ class RetuneProtocolTests(unittest.TestCase):
                  for i, a, b in [(0, .2, .9), (1, .3, .4), (2, .3, .5), (3, .3, .5)]]
         self.assertEqual(select(cells)['parameters'], 2)
         grid = expanded_grid()
-        self.assertEqual(len(grid), 63)
+        self.assertEqual(len(grid), 85)
         self.assertEqual(len({tuple(sorted(p.items())) for p in grid}), len(grid))
         self.assertTrue(any(p['alpha'] == 0 for p in grid))
 

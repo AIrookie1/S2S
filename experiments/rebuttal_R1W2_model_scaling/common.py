@@ -67,13 +67,13 @@ def parameter_grid(method, tune):
         return [{'alpha': x} for x in values]
     if method == 'spherical':
         return [dict(kappa=k, alpha=a, beta=b)
-                for k in ([1.0, 3.0, 5.0, 10.0, 20.0, 50.0] if tune else [20.0])
-                for a in ([0.15, 0.3, 0.6] if tune else [0.6])
+                for k in ([1.0, 3.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0] if tune else [20.0])
+                for a in ([0.15, 0.3, 0.6, 0.9] if tune else [0.6])
                 for b in ([0.1, 0.4] if tune else [0.4])]
     if method == 's2s_l':
         return [dict(strength=s, slerp_t=t)
-                for s in ([0.5, 1.0, 2.0, 3.0] if tune else [1.0])
-                for t in ([0.0, 0.2, 0.5, 0.8, 1.0] if tune else [0.5])]
+                for s in ([0.5, 1.0, 3.0] if tune else [1.0])
+                for t in ([0.1, 0.2, 0.5, 0.8, 1.0] if tune else [0.5])]
     if method in ('s2s', 's2s_r'):
         return [dict(weight_kappa=k, margin=m)
                 for k in ([1.0, 3.0, 5.0] if tune else [3.0])

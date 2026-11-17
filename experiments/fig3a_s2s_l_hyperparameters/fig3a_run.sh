@@ -26,6 +26,8 @@ configure_S2S_L_model() {
     LLAMA|QWEN) source "$REPO_ROOT/configs/S2S_L/$key/truthfulqa.sh" ;;
     *) echo "Unknown model: $1 (expected LLAMA or QWEN)" >&2; return 2 ;;
   esac
+  # W4 selects the best S2S-L setting on the complete dataset.
+  EVAL_SPLIT="all"
 }
 
 for MODEL_KEY in "${MODEL_KEYS[@]}"; do

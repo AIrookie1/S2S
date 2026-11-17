@@ -37,7 +37,8 @@ def read(path):
 
 
 def expanded_grid():
-    # Keep old candidates first so ties retain their original deterministic order.
+    # Keep candidates in deterministic order while avoiding duplicates introduced
+    # when the main scaling grid is expanded.
     grid = parameter_grid('spherical', True)
     grid += [dict(kappa=k, alpha=a, beta=.1)
              for k in (100., 200., 500.) for a in (.3, .6, .9)]
@@ -48,7 +49,14 @@ def expanded_grid():
     grid += [dict(kappa=k, alpha=.9, beta=.1) for k in (20., 50.)]
     grid += [dict(kappa=k, alpha=.6, beta=.4) for k in (100., 200., 500.)]
     grid += [dict(kappa=20., alpha=0., beta=.1)]  # Explicit no-intervention candidate.
-    return grid
+    unique = []
+    seen = set()
+    for params in grid:
+        key = tuple(sorted(params.items()))
+        if key not in seen:
+            seen.add(key)
+            unique.append(params)
+    return unique
 
 
 def validate_split(split):
